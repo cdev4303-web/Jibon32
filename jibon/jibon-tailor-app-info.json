@@ -1,0 +1,15 @@
+{
+  "appName": "Jibon Tailor",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "packageName": "com.jibontailor.app",
+  "description": "Professional Tailoring Shop Management System for Jibon Tailor Shop",
+  "developer": "Jibon Tailor Development Team",
+  "liveWebUrl": "https://ais-pre-xvaahh6dga2msv7jjvvztm-435093563543.europe-west2.run.app",
+  "offlineSupport": true,
+  "cameraSupport": true,
+  "printerSupport": true,
+  "whatsAppShareSupport": true,
+  "pwaCompliant": true,
+  "androidStudioReady": true
+}

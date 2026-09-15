@@ -1,0 +1,81 @@
+name: Build Jibon Tailor Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # Allows 1-click manual trigger from GitHub Actions tab
+
+jobs:
+  build-apk:
+    name: Build & Package APK
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 📦 Install Web Dependencies
+        run: npm install --no-audit
+
+      - name: 🏗️ Build Web Application
+        run: npm run build
+
+      - name: 🔄 Sync Web Assets to Android Project
+        run: |
+          mkdir -p jibon/android-studio-project/app/src/main/assets/web
+          cp -r dist/* jibon/android-studio-project/app/src/main/assets/web/
+          echo "Web assets synced successfully."
+
+      - name: ☕ Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 🐘 Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
+
+      - name: 🔨 Build Android APK with Gradle
+        working-directory: jibon/android-studio-project
+        run: |
+          chmod +x gradlew || true
+          gradle assembleDebug --stacktrace
+
+      - name: 📂 Prepare APK Files for Download
+        run: |
+          mkdir -p final-apks
+          # Copy generated APKs to final-apks folder
+          find jibon/android-studio-project/app/build/outputs/apk -name "*.apk" -type f -exec cp -v {} final-apks/ \;
+          echo "Generated APKs:"
+          ls -lh final-apks/
+
+      - name: 🚀 Upload APK Artifacts to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jibon-Tailor-Android-APK
+          path: final-apks/*.apk
+          retention-days: 30
+
+      - name: 🏷️ Publish APK to GitHub Release (If tagged)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: final-apks/*.apk
+          name: Jibon Tailor Mobile App ${{ github.ref_name }}
+          body: |
+            ## 📱 Jibon Tailor Android Application APK
+            Download and install the APK on your Android device:
+            - **`app-debug.apk`** (Ready for direct installation on any Android device)

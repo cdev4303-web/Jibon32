@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.jibontailor.app",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:CD:AB:70:E1:40:02:39:5B:3C:99:99:A8:6A:9A:88:86:E0:46:CB:59:75:5F:8B:7B:AE:27:0B:44:09"
+      ]
+    }
+  }
+]

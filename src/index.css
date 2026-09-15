@@ -1,0 +1,374 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-family: 'Cairo', 'Noto Sans Devanagari', 'Hind Siliguri', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    color: #0f172a;
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    letter-spacing: 0.01em;
+  }
+
+  /* Boost contrast on subtle gray text for high legibility on mobile */
+  .text-slate-500,
+  .text-gray-500 {
+    color: #334155; /* slate-700 instead of washed out slate-500 */
+  }
+
+  .text-slate-400,
+  .text-gray-400 {
+    color: #475569; /* slate-600 */
+  }
+
+  /* Form controls font weight & clarity */
+  input, select, textarea, button {
+    font-family: inherit;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #64748b;
+    opacity: 1;
+  }
+
+  /* Ensure headings have deep rich contrast */
+  h1, h2, h3, h4, h5, h6 {
+    color: #020617;
+    font-weight: 700;
+  }
+}
+
+/* Custom utility for extra clear small text */
+.text-clear-xs {
+  font-size: 0.75rem;
+  line-height: 1.15rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.text-clear-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* ========================================================================= */
+/* Tactile Button Shadows & Depth Enhancements                              */
+/* ========================================================================= */
+.btn-shadow,
+button.shadow-btn {
+  box-shadow: 0 3px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-shadow:hover,
+button.shadow-btn:hover {
+  box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.16), 0 3px 6px -3px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.btn-shadow:active,
+button.shadow-btn:active {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.12) inset;
+  transform: translateY(1px);
+}
+
+.btn-shadow-emerald {
+  box-shadow: 0 4px 10px -2px rgba(6, 78, 59, 0.25), 0 2px 4px -2px rgba(6, 78, 59, 0.15);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-shadow-emerald:hover {
+  box-shadow: 0 7px 14px -2px rgba(6, 78, 59, 0.35), 0 3px 6px -2px rgba(6, 78, 59, 0.2);
+  transform: translateY(-1px);
+}
+.btn-shadow-emerald:active {
+  box-shadow: 0 2px 4px 0 rgba(6, 78, 59, 0.3) inset;
+  transform: translateY(1px);
+}
+
+.btn-shadow-amber {
+  box-shadow: 0 4px 10px -2px rgba(217, 119, 6, 0.28), 0 2px 4px -2px rgba(217, 119, 6, 0.15);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-shadow-amber:hover {
+  box-shadow: 0 7px 14px -2px rgba(217, 119, 6, 0.38), 0 3px 6px -2px rgba(217, 119, 6, 0.2);
+  transform: translateY(-1px);
+}
+.btn-shadow-amber:active {
+  box-shadow: 0 2px 4px 0 rgba(217, 119, 6, 0.3) inset;
+  transform: translateY(1px);
+}
+
+.btn-shadow-indigo {
+  box-shadow: 0 4px 10px -2px rgba(79, 70, 229, 0.25), 0 2px 4px -2px rgba(79, 70, 229, 0.15);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-shadow-indigo:hover {
+  box-shadow: 0 7px 14px -2px rgba(79, 70, 229, 0.35), 0 3px 6px -2px rgba(79, 70, 229, 0.2);
+  transform: translateY(-1px);
+}
+.btn-shadow-indigo:active {
+  box-shadow: 0 2px 4px 0 rgba(79, 70, 229, 0.3) inset;
+  transform: translateY(1px);
+}
+
+.btn-shadow-rose {
+  box-shadow: 0 4px 10px -2px rgba(225, 29, 72, 0.25), 0 2px 4px -2px rgba(225, 29, 72, 0.15);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-shadow-rose:hover {
+  box-shadow: 0 7px 14px -2px rgba(225, 29, 72, 0.35), 0 3px 6px -2px rgba(225, 29, 72, 0.2);
+  transform: translateY(-1px);
+}
+.btn-shadow-rose:active {
+  box-shadow: 0 2px 4px 0 rgba(225, 29, 72, 0.3) inset;
+  transform: translateY(1px);
+}
+
+/* Give standard interactive buttons a default tactile touch feedback */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+
+/* ========================================================================= */
+/* Print media styling to ensure zero blank pages and pristine A4 layout     */
+/* ========================================================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    box-sizing: border-box !important;
+    text-shadow: none !important;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    font-size: 11pt !important;
+    transform: none !important;
+    zoom: 1 !important;
+  }
+
+  /* Reset outer application wrappers so responsive desktop/mobile layout does NOT control print */
+  #root,
+  .app-root,
+  .min-h-screen,
+  .bg-slate-100 {
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    transform: none !important;
+  }
+
+  /* When print modal is active, completely eliminate background layout from print */
+  .has-active-print-modal > aside,
+  .has-active-print-modal > div.flex-1 {
+    display: none !important;
+  }
+
+  /* Completely eliminate non-printable shell: sidebars, nav, headers, bottom bars, buttons */
+  header,
+  nav,
+  aside,
+  .sidebar,
+  .navigation,
+  .mobile-navigation,
+  .desktop-navigation,
+  .print-hidden,
+  .print\:hidden,
+  .no-print,
+  .floating-action-btn,
+  .toast-banner,
+  button:not(.allow-print-button) {
+    display: none !important;
+  }
+
+  /* Unconstrain and flatten modal overlay for seamless page pagination */
+  .fixed.inset-0,
+  .print-modal-overlay {
+    position: static !important;
+    display: block !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    border: none !important;
+    inset: auto !important;
+    transform: none !important;
+  }
+
+  /* Unconstrain container inside modal */
+  .relative.flex.max-h-\[96vh\],
+  .relative.flex.max-h-\[95vh\],
+  .relative.flex.max-h-\[90vh\],
+  .max-h-\[96vh\],
+  .max-h-\[95vh\],
+  .max-h-\[90vh\],
+  .print-modal-container {
+    position: static !important;
+    display: block !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  /* Dedicated printable sheet area: print-safe A4 width, zero extra margins */
+  #printable-karigar-area,
+  #printable-area,
+  #printable-expense-area,
+  #printable-daily-accounts-area,
+  #printable-report-area,
+  #printable-customer-area,
+  #printable-measurement-area,
+  .print-invoice {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    box-sizing: border-box !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Table formatting for clean page breaks */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-after: auto;
+  }
+
+  th, td {
+    word-break: normal !important;
+  }
+
+  /* Card and section break control rules: prevent cutting content across pages */
+  .print-avoid-break,
+  .print-section-header,
+  .print-section-meta,
+  .print-card-measurement,
+  .print-card-financials,
+  .print-section-photos,
+  .print-section-footer,
+  .print-card,
+  .print-photo-item {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Image protection: preserve aspect ratio, never overflow or stretch */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Explicit print color preservation for emerald shop header */
+  .print-invoice-header-emerald {
+    background-color: #064e3b !important;
+    background: #064e3b !important;
+    background-image: linear-gradient(135deg, #064e3b 0%, #047857 50%, #064e3b 100%) !important;
+    box-shadow: inset 0 0 0 1000px #064e3b !important;
+    color: #ffffff !important;
+    border: 2px solid #064e3b !important;
+    border-bottom: 4px solid #f59e0b !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  .print-invoice-header-emerald * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  .print-invoice-header-emerald h1 {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-invoice-header-emerald p {
+    color: #d1fae5 !important;
+    -webkit-text-fill-color: #d1fae5 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-invoice-header-emerald .text-amber-200,
+  .print-invoice-header-emerald .text-amber-300 {
+    color: #fde68a !important;
+    -webkit-text-fill-color: #fde68a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

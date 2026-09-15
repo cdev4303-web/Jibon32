@@ -1,0 +1,6 @@
+{
+  "name": "Jibon Tailor",
+  "description": "Professional tailoring shop management system with AI Business Manager, orders, billing, measurements, WhatsApp PNG invoice & catalog sharing, ready-for-pickup alerts, karigar ledger, and accounting.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
