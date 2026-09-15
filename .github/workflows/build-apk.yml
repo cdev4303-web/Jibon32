@@ -41,7 +41,11 @@ jobs:
           distribution: 'temurin'
 
       - name: 🤖 Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          yes | sdkmanager --licenses 2>/dev/null || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: 🐘 Setup Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -50,8 +54,11 @@ jobs:
 
       - name: 🔨 Build Android APK with Gradle
         working-directory: jibon/android-studio-project
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
-          chmod +x gradlew || true
+          echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
           gradle assembleDebug --stacktrace
 
       - name: 📂 Prepare APK Files for Download
