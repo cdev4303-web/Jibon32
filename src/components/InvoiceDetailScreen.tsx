@@ -26,6 +26,8 @@ import {
   CheckCircle2,
   Sparkles,
   QrCode,
+  Loader2,
+  ChevronDown,
 } from 'lucide-react';
 
 interface InvoiceDetailScreenProps {
@@ -258,18 +260,28 @@ export const InvoiceDetailScreen: React.FC<InvoiceDetailScreenProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={handleSendReadyWhatsApp}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black px-4 py-2.5 text-xs shadow-md transition active:scale-95 whitespace-nowrap"
-            title={lang === 'EN' ? 'Send Ready Notification to Customer WhatsApp' : 'কাস্টমারের হোয়াটসঅ্যাপে সরাসরি কাপড় রেডি মেসেজ পাঠান'}
-          >
-            <MessageSquareText className="h-4 w-4" />
-            <span>
-              {lang === 'EN'
-                ? 'Send Dress Ready WhatsApp Message'
-                : 'কাপড় রেডি WhatsApp মেসেজ পাঠান'}
-            </span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSendReadyWhatsApp}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-black px-3.5 py-2 text-xs shadow-md transition active:scale-95 whitespace-nowrap"
+              title={lang === 'EN' ? 'Send Ready Notification to Customer WhatsApp' : 'কাস্টমারের হোয়াটসঅ্যাপে সরাসরি কাপড় রেডি মেসেজ পাঠান'}
+            >
+              <MessageSquareText className="h-4 w-4" />
+              <span>
+                {lang === 'EN'
+                  ? 'Send Ready WhatsApp'
+                  : 'কাপড় রেডি WhatsApp'}
+              </span>
+            </button>
+            <a
+              href="#invoice-bottom-actions"
+              className="flex items-center justify-center gap-1 rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-900 font-bold px-3 py-2 text-xs transition active:scale-95 whitespace-nowrap"
+              title={lang === 'EN' ? 'Scroll down to all action buttons' : 'নিচের সকল অ্যাকশন বাটন দেখুন'}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+              <span>{lang === 'EN' ? 'Buttons Below' : 'নিচের বাটন'}</span>
+            </a>
+          </div>
         </div>
       )}
 
@@ -326,70 +338,23 @@ export const InvoiceDetailScreen: React.FC<InvoiceDetailScreenProps> = ({
           </div>
         </div>
 
-        {/* Quick Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10 print:hidden">
-          {/* Primary 1: WhatsApp PNG (Direct to customer number) - Vibrant Emerald */}
-          <button
-            onClick={handleSendInvoicePng}
-            disabled={sendingWhatsAppPng}
-            className="flex items-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 text-xs shadow-lg transition active:scale-95"
-            title={
-              lang === 'EN'
-                ? 'Send invoice receipt image directly to customer WhatsApp'
-                : 'ইনভয়েসটি PNG ছবি আকারে সরাসরি কাস্টমারের হোয়াটসঅ্যাপে পাঠান'
-            }
+        {/* Top Header Card Info Bar with Direct Link to Bottom Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-white/10 print:hidden text-xs">
+          <div className="flex items-center gap-1.5 text-slate-300 text-[11px]">
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+            <span>
+              {lang === 'EN'
+                ? 'Action buttons (Ready WhatsApp, PNG, Print, Payment) are located at the bottom of the invoice.'
+                : 'কাপড় রেডি মেসেজ, WhatsApp PNG, প্রিন্ট ও পেমেন্ট বাটন ইনভয়েসের নিচে সাজানো রয়েছে।'}
+            </span>
+          </div>
+          <a
+            href="#invoice-bottom-actions"
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-3.5 py-1.5 transition active:scale-95 shadow-md"
           >
-            <Share2 className="h-4 w-4 text-slate-950" />
-            {sendingWhatsAppPng
-              ? lang === 'EN'
-                ? 'Generating...'
-                : 'তৈরি হচ্ছে...'
-              : lang === 'EN'
-              ? 'Send Invoice (PNG) to WhatsApp'
-              : 'WhatsApp এ ইনভয়েস (PNG) পাঠান'}
-          </button>
-
-          {/* Primary 2: View / Download PNG Modal - Vibrant Sky Blue */}
-          <button
-            onClick={() => {
-              setIsReadyMode(false);
-              setIsImageModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-3.5 py-2 text-xs shadow-lg transition active:scale-95"
-          >
-            <ImageIcon className="h-4 w-4 text-slate-950" />
-            {t.saveToGallery}
-          </button>
-
-          {/* Primary 3: QR Code Verification Modal - Vibrant Fuchsia / Purple */}
-          <button
-            onClick={handleOpenQrModal}
-            className="flex items-center gap-1.5 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-3.5 py-2 text-xs shadow-lg transition active:scale-95"
-            title={lang === 'EN' ? 'Show Invoice Verification QR Code' : 'ইনভয়েস ভেরিফিকেশন QR কোড দেখুন'}
-          >
-            <QrCode className="h-4 w-4" />
-            {lang === 'EN' ? 'Invoice QR Code' : 'QR কোড স্ক্যান'}
-          </button>
-
-          {/* Print Slip - Deep Indigo */}
-          <button
-            onClick={() => onOpenPrintModal(invoice)}
-            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3.5 py-2 text-xs shadow-lg transition active:scale-95"
-          >
-            <Printer className="h-4 w-4" />
-            {t.printInvoice}
-          </button>
-
-          {/* Add Due Payment - Golden Amber */}
-          {invoice.remainingDue > 0 && (
-            <button
-              onClick={() => onOpenPaymentModal(invoice)}
-              className="flex items-center gap-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black px-3.5 py-2 text-xs shadow-lg transition active:scale-95"
-            >
-              <DollarSign className="h-4 w-4" />
-              {t.addPayment}
-            </button>
-          )}
+            <span>{lang === 'EN' ? 'Action Buttons Below ↓' : 'নিচের বাটনসমূহ ↓'}</span>
+            <ChevronDown className="h-3.5 w-3.5" />
+          </a>
         </div>
       </div>
 
@@ -945,6 +910,236 @@ export const InvoiceDetailScreen: React.FC<InvoiceDetailScreenProps> = ({
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* READY INVOICE / INVOICE PROFILE ACTION BUTTONS (TWO-LINE ORGANIZED LAYOUT) */}
+      {/* ========================================================================= */}
+      <div
+        id="invoice-bottom-actions"
+        className={`rounded-2xl border-2 p-5 text-white shadow-xl space-y-4 print:hidden transition-all ${
+          invoice.orderStatus === 'Ready for Pickup'
+            ? 'border-teal-400 bg-gradient-to-b from-slate-900 via-teal-950/80 to-slate-950 ring-2 ring-teal-500/30'
+            : 'border-emerald-600/40 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950'
+        }`}
+      >
+        {/* Action Panel Title Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3.5">
+          <div className="flex items-center gap-3">
+            <div
+              className={`rounded-xl p-2.5 text-white shadow-md ${
+                invoice.orderStatus === 'Ready for Pickup'
+                  ? 'bg-teal-500 text-slate-950 ring-2 ring-teal-300 animate-pulse'
+                  : 'bg-emerald-600'
+              }`}
+            >
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-white">
+                  {invoice.orderStatus === 'Ready for Pickup'
+                    ? (lang === 'EN' ? 'Ready Invoice Action Center' : 'রেডি ইনভয়েস অ্যাকশন বাটনসমূহ')
+                    : (lang === 'EN' ? 'Invoice Action Center' : 'ইনভয়েস অ্যাকশন বাটনসমূহ')}
+                </h3>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-black border ${
+                    invoice.orderStatus === 'Ready for Pickup'
+                      ? 'bg-teal-900 text-teal-200 border-teal-400'
+                      : 'bg-emerald-900 text-emerald-200 border-emerald-500'
+                  }`}
+                >
+                  ● {invoice.orderStatus}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                {lang === 'EN'
+                  ? `Customer: ${invoice.customerName} • Mobile: ${invoice.customerPhone}`
+                  : `কাস্টমার: ${invoice.customerName} • মোবাইল: ${invoice.customerPhone}`}
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Status Dropdown */}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-[11px] text-slate-300 font-semibold">
+              {lang === 'EN' ? 'Status:' : 'স্ট্যাটাস:'}
+            </span>
+            <select
+              value={invoice.orderStatus}
+              onChange={(e) => onUpdateStatus(invoice.id, e.target.value as Invoice['orderStatus'])}
+              className="rounded-lg bg-slate-800 border border-slate-700 text-xs font-bold text-white px-3 py-1.5 outline-none focus:border-teal-400 cursor-pointer shadow-inner"
+            >
+              <option value="Pending">{lang === 'EN' ? 'Pending' : 'পেন্ডিং'}</option>
+              <option value="In Progress">{lang === 'EN' ? 'In Progress' : 'কাজ চলছে'}</option>
+              <option value="Ready for Pickup">{lang === 'EN' ? 'Ready for Pickup (কাপড় রেডি)' : 'কাপড় রেডি (Ready)'}</option>
+              <option value="Delivered">{lang === 'EN' ? 'Delivered (ডেলিভারি)' : 'ডেলিভারি সম্পন্ন'}</option>
+              <option value="Cancelled">{lang === 'EN' ? 'Cancelled' : 'বাতিল'}</option>
+            </select>
+          </div>
+        </div>
+
+        {/* The Action Buttons Organized Strictly in Two Lines */}
+        <div className="space-y-4 pt-1">
+          {/* ========================================================================= */}
+          {/* LINE 1: Primary Delivery, Customer WhatsApp & Payment Actions (Top Line) */}
+          {/* ========================================================================= */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-teal-300 font-bold px-1">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-teal-400"></span>
+                {lang === 'EN' ? 'Line 1: Primary WhatsApp & Payment Actions' : '১ম লাইন: কাস্টমার WhatsApp ও পেমেন্ট অ্যাকশন'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {/* Button 1.1: If Ready for Pickup -> Send Ready WhatsApp Message */}
+              {invoice.orderStatus === 'Ready for Pickup' ? (
+                <button
+                  type="button"
+                  onClick={handleSendReadyWhatsApp}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black py-3 px-4 text-xs shadow-lg transition active:scale-95 border-2 border-teal-300"
+                  title={lang === 'EN' ? 'Send Ready Notification to Customer WhatsApp' : 'কাস্টমারের হোয়াটসঅ্যাপে কাপড় রেডি মেসেজ পাঠান'}
+                >
+                  <MessageSquareText className="h-4 w-4 shrink-0 text-slate-950" />
+                  <span className="font-black">
+                    {lang === 'EN' ? 'Send Ready WhatsApp' : 'কাপড় রেডি WhatsApp মেসেজ'}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onUpdateStatus(invoice.id, 'Ready for Pickup')}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-teal-900/80 hover:bg-teal-800 text-teal-200 font-bold py-3 px-4 text-xs border border-teal-600 shadow-sm transition active:scale-95"
+                  title={lang === 'EN' ? 'Mark order as Ready for Pickup' : 'অর্ডারটি কাপড় রেডি হিসেবে চিহ্নিত করুন'}
+                >
+                  <Sparkles className="h-4 w-4 shrink-0 text-teal-300" />
+                  <span>
+                    {lang === 'EN' ? 'Mark as Ready' : 'কাপড় রেডি চিহ্নিত করুন'}
+                  </span>
+                </button>
+              )}
+
+              {/* Button 1.2: Send Invoice PNG to WhatsApp */}
+              <button
+                type="button"
+                onClick={handleSendInvoicePng}
+                disabled={sendingWhatsAppPng}
+                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 px-4 text-xs shadow-lg transition active:scale-95 border-2 border-emerald-300 disabled:opacity-50"
+                title={lang === 'EN' ? 'Send invoice receipt image directly to customer WhatsApp' : 'ইনভয়েসটি PNG ছবি আকারে সরাসরি কাস্টমারের হোয়াটসঅ্যাপে পাঠান'}
+              >
+                {sendingWhatsAppPng ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0 text-slate-950" />
+                    <span>{lang === 'EN' ? 'Generating PNG...' : 'ছবি তৈরি হচ্ছে...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="h-4 w-4 shrink-0 text-slate-950" />
+                    <span className="font-black">
+                      {lang === 'EN' ? 'Send Invoice (PNG)' : 'WhatsApp এ ইনভয়েস (PNG)'}
+                    </span>
+                  </>
+                )}
+              </button>
+
+              {/* Button 1.3: Collect Due Payment OR Mark Delivered */}
+              {invoice.remainingDue > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenPaymentModal(invoice)}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black py-3 px-4 text-xs shadow-lg transition active:scale-95 border-2 border-amber-300"
+                  title={lang === 'EN' ? 'Record Due Payment' : 'বকেয়া টাকা জমা নিন'}
+                >
+                  <DollarSign className="h-4 w-4 shrink-0" />
+                  <span className="font-black">
+                    {lang === 'EN'
+                      ? `Collect Due (${shop.currency} ${invoice.remainingDue.toFixed(0)})`
+                      : `বাকি জমা (${shop.currency} ${invoice.remainingDue.toFixed(0)})`}
+                  </span>
+                </button>
+              ) : invoice.orderStatus === 'Ready for Pickup' ? (
+                <button
+                  type="button"
+                  onClick={() => onUpdateStatus(invoice.id, 'Delivered')}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-black py-3 px-4 text-xs shadow-lg transition active:scale-95 border-2 border-blue-300"
+                  title={lang === 'EN' ? 'Mark dress as Delivered to customer' : 'পোশাক ডেলিভারি সম্পন্ন চিহ্নিত করুন'}
+                >
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span className="font-black">
+                    {lang === 'EN' ? 'Mark Delivered' : 'ডেলিভারি সম্পন্ন করুন'}
+                  </span>
+                </button>
+              ) : (
+                <div className="flex items-center justify-center gap-2 rounded-xl bg-emerald-950/70 border border-emerald-700 text-emerald-300 font-bold py-3 px-4 text-xs text-center">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span>{lang === 'EN' ? 'All Dues Paid' : 'সব টাকা পরিশোধিত'}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* LINE 2: Print, Download, QR Code & Management Tools (Bottom Line)          */}
+          {/* ========================================================================= */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 font-bold px-1">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-indigo-400"></span>
+                {lang === 'EN' ? 'Line 2: Print, Download & Edit Tools' : '২য় লাইন: প্রিন্ট, ডাউনলোড ও অন্যান্য অপশন'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {/* Button 2.1: Print Slip */}
+              <button
+                type="button"
+                onClick={() => onOpenPrintModal(invoice)}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-3 text-xs shadow-md transition active:scale-95 border border-indigo-400"
+                title={lang === 'EN' ? 'Print Slip' : 'রসিদ প্রিন্ট করুন'}
+              >
+                <Printer className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{t.printInvoice}</span>
+              </button>
+
+              {/* Button 2.2: Save / View PNG Modal */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsReadyMode(invoice.orderStatus === 'Ready for Pickup');
+                  setIsImageModalOpen(true);
+                }}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black py-2.5 px-3 text-xs shadow-md transition active:scale-95 border border-sky-300"
+                title={lang === 'EN' ? 'Save PNG image to phone gallery' : 'PNG ছবি ভিউ ও গ্যালারিতে সেভ'}
+              >
+                <ImageIcon className="h-3.5 w-3.5 shrink-0 text-slate-950" />
+                <span className="truncate">{t.saveToGallery}</span>
+              </button>
+
+              {/* Button 2.3: QR Code Verification */}
+              <button
+                type="button"
+                onClick={handleOpenQrModal}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2.5 px-3 text-xs shadow-md transition active:scale-95 border border-fuchsia-400"
+                title={lang === 'EN' ? 'Show Invoice Verification QR Code' : 'ইনভয়েস ভেরিফিকেশন QR কোড দেখুন'}
+              >
+                <QrCode className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{lang === 'EN' ? 'QR Code' : 'QR কোড'}</span>
+              </button>
+
+              {/* Button 2.4: Edit Invoice */}
+              <button
+                type="button"
+                onClick={() => onEdit(invoice)}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-3 text-xs shadow-md transition active:scale-95 border border-slate-600"
+                title={lang === 'EN' ? 'Edit Invoice' : 'ইনভয়েস এডিট করুন'}
+              >
+                <Edit2 className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{t.edit}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Direct Canvas Image Modal for Instant Download & Gallery Save */}
       <InvoiceImageModal

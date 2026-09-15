@@ -137,6 +137,9 @@ button:not(:disabled) {
   cursor: pointer;
 }
 
+#isolated-print-target-root {
+  display: none;
+}
 
 /* ========================================================================= */
 /* Print media styling to ensure zero blank pages and pristine A4 layout     */
@@ -153,6 +156,27 @@ button:not(:disabled) {
     color-adjust: exact !important;
     box-sizing: border-box !important;
     text-shadow: none !important;
+  }
+
+  /* When isolated print target mode is active on document.body, hide #root and show ONLY #isolated-print-target-root */
+  body.is-printing-active > #root,
+  body.is-printing-active > *:not(#isolated-print-target-root) {
+    display: none !important;
+  }
+
+  body.is-printing-active #isolated-print-target-root {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+    height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 
   html, body {
@@ -190,9 +214,8 @@ button:not(:disabled) {
     transform: none !important;
   }
 
-  /* When print modal is active, completely eliminate background layout from print */
-  .has-active-print-modal > aside,
-  .has-active-print-modal > div.flex-1 {
+  /* When print modal is active, eliminate background sidebar from print */
+  .has-active-print-modal > aside {
     display: none !important;
   }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Invoice, Shop, Language } from '../types';
-import { Printer, X, Image as ImageIcon, Send, MessageSquareText, QrCode, FileDown, Download, Loader2 } from 'lucide-react';
+import { Printer, X, Image as ImageIcon, Send, MessageSquareText, QrCode, FileDown, Download, Loader2, Share2 } from 'lucide-react';
 import { InvoiceImageModal } from './InvoiceImageModal';
 import { Logo } from './Logo';
 import { openWhatsAppUrl, createInvoiceWhatsAppMessage, createReadyWhatsAppMessage } from '../utils/whatsapp';
@@ -441,6 +441,96 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             <div className="mt-6 border-t border-slate-200 pt-3.5 text-center text-[10px] text-slate-500 print-section-footer print-avoid-break">
               <p className="leading-normal mb-1">1. Please present this invoice receipt at the time of dress delivery/collection.</p>
               <p className="font-bold text-emerald-900 leading-normal">Thank you for your business with {shop.name}!</p>
+            </div>
+          </div>
+
+          {/* Bottom Action Buttons Bar (Two Lines Layout) - Print Hidden */}
+          <div className="border-t border-slate-200 bg-slate-900 p-4 print:hidden space-y-2.5">
+            {/* Line 1: Primary Print & WhatsApp Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                onClick={handlePrint}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 py-2.5 px-3 text-xs font-bold text-white shadow-md transition active:scale-95 border border-indigo-400"
+                title={lang === 'EN' ? 'Print or Save via Browser Dialog' : 'সরাসরি প্রিন্ট করুন'}
+              >
+                <Printer className="h-4 w-4 shrink-0" />
+                <span>{lang === 'EN' ? 'Print Slip' : 'রসিদ প্রিন্ট করুন'}</span>
+              </button>
+
+              {invoice.orderStatus === 'Ready for Pickup' ? (
+                <button
+                  onClick={() => {
+                    const msg = createReadyWhatsAppMessage(invoice, shop, (lang as 'EN' | 'BN') || 'BN');
+                    openWhatsAppUrl(invoice.customerPhone, msg);
+                  }}
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 py-2.5 px-3 text-xs font-black text-slate-950 shadow-md transition active:scale-95 border border-teal-300"
+                  title={lang === 'EN' ? 'Send Ready alert to customer' : 'কাস্টমারকে কাপড় রেডি মেসেজ পাঠান'}
+                >
+                  <MessageSquareText className="h-4 w-4 shrink-0" />
+                  <span>{lang === 'EN' ? 'Ready Alert WhatsApp' : 'কাপড় রেডি মেসেজ'}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsReadyMode(false);
+                    setIsImageModalOpen(true);
+                  }}
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 px-3 text-xs font-bold text-white shadow-md transition active:scale-95 border border-emerald-400"
+                >
+                  <ImageIcon className="h-4 w-4 shrink-0" />
+                  <span>{lang === 'EN' ? 'WhatsApp Image' : 'WhatsApp PNG'}</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setIsReadyMode(invoice.orderStatus === 'Ready for Pickup');
+                  setIsImageModalOpen(true);
+                }}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 px-3 text-xs font-bold text-white shadow-md transition active:scale-95 border border-emerald-400"
+              >
+                <Share2 className="h-4 w-4 shrink-0" />
+                <span>{lang === 'EN' ? 'Share Invoice (PNG)' : 'ইনভয়েস শেয়ার (PNG)'}</span>
+              </button>
+            </div>
+
+            {/* Line 2: Download HD PNG, A4 PDF & Close */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={handleDownloadPng}
+                disabled={isGeneratingPng}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 py-2 px-3 text-xs font-black text-slate-950 shadow-md transition active:scale-95 disabled:opacity-50 border border-sky-300"
+                title={lang === 'EN' ? 'Download High-Resolution PNG Image' : 'PNG ছবি ডাউনলোড'}
+              >
+                {isGeneratingPng ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                <span className="truncate">{isGeneratingPng ? (lang === 'EN' ? 'Saving...' : 'সেভ হচ্ছে...') : (lang === 'EN' ? 'Download PNG' : 'PNG ডাউনলোড')}</span>
+              </button>
+
+              <button
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 py-2 px-3 text-xs font-black text-slate-950 shadow-md transition active:scale-95 disabled:opacity-50 border border-amber-300"
+                title={lang === 'EN' ? 'Download A4 PDF Document' : 'A4 PDF ডাউনলোড'}
+              >
+                {isGeneratingPdf ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <FileDown className="h-3.5 w-3.5" />
+                )}
+                <span className="truncate">{isGeneratingPdf ? (lang === 'EN' ? 'Creating...' : 'তৈরি হচ্ছে...') : (lang === 'EN' ? 'Download PDF' : 'PDF ডাউনলোড')}</span>
+              </button>
+
+              <button
+                onClick={onClose}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 py-2 px-3 text-xs font-bold text-slate-300 hover:text-white transition active:scale-95 border border-slate-700"
+              >
+                <X className="h-3.5 w-3.5" />
+                <span>{lang === 'EN' ? 'Close' : 'বন্ধ করুন'}</span>
+              </button>
             </div>
           </div>
         </div>

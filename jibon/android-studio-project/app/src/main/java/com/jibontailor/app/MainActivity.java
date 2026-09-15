@@ -75,6 +75,8 @@ public class MainActivity extends AppCompatActivity {
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
+        settings.setAllowFileAccessFromFileURLs(true);
+        settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setBuiltInZoomControls(false);
@@ -94,13 +96,20 @@ public class MainActivity extends AppCompatActivity {
             public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimetype, long contentLength) {
                 try {
                     if (url != null && url.startsWith("data:")) {
-                        // Handle data: URI download (e.g. data:image/png;base64,... or data:application/pdf;base64,...)
+                        // Handle data: URI download (image, pdf, or json backup)
                         if (url.contains("image/")) {
                             String filename = "Jibon_Tailor_" + System.currentTimeMillis() + ".png";
                             nativeBridge.saveImageBase64(url, filename, "Downloaded Image");
                         } else if (url.contains("application/pdf")) {
                             String filename = "Jibon_Tailor_" + System.currentTimeMillis() + ".pdf";
                             nativeBridge.savePdfBase64(url, filename);
+                        } else if (url.contains("json") || (mimetype != null && mimetype.contains("json"))) {
+                            String filename = "jibon_tailor_backup_" + System.currentTimeMillis() + ".json";
+                            byte[] decoded = nativeBridge.decodeBase64(url);
+                            if (decoded != null) {
+                                String jsonStr = new String(decoded, "UTF-8");
+                                nativeBridge.saveBackupJson(jsonStr, filename);
+                            }
                         }
                     } else if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
                         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
@@ -155,7 +164,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
-            // Camera & Gallery File Chooser
+            // Camera, Gallery, and File Chooser (Smart handling for Backup & Images)
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 if (mFilePathCallback != null) {
@@ -163,7 +172,41 @@ public class MainActivity extends AppCompatActivity {
                 }
                 mFilePathCallback = filePathCallback;
 
-                Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                boolean isJsonBackupRequest = false;
+                boolean isImageRequest = false;
+
+                if (fileChooserParams != null && fileChooserParams.getAcceptTypes() != null) {
+                    for (String type : fileChooserParams.getAcceptTypes()) {
+                        if (type != null) {
+                            String lower = type.trim().toLowerCase(Locale.ROOT);
+                            if (lower.contains("json") || lower.endsWith(".json")) {
+                                isJsonBackupRequest = true;
+                            }
+                            if (lower.contains("image")) {
+                                isImageRequest = true;
+                            }
+                        }
+                    }
+                }
+
+                // If user is restoring a backup file (.json)
+                if (isJsonBackupRequest) {
+                    mCameraPhotoPath = null;
+                    Intent contentSelectionIntent = new Intent(Intent.ACTION_GET_CONTENT);
+                    contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE);
+                    contentSelectionIntent.setType("*/*");
+                    String[] mimeTypes = new String[]{"application/json", "text/plain", "application/octet-stream", "*/*"};
+                    contentSelectionIntent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+
+                    Intent chooserIntent = new Intent(Intent.ACTION_CHOOSER);
+                    chooserIntent.putExtra(Intent.EXTRA_INTENT, contentSelectionIntent);
+                    chooserIntent.putExtra(Intent.EXTRA_TITLE, "ব্যাকআপ ফাইল (.json) নির্বাচন করুন");
+                    startActivityForResult(chooserIntent, INPUT_FILE_REQUEST_CODE);
+                    return true;
+                }
+
+                // Otherwise, for garment/customer photos, allow Camera capture + Image selection
+                Intent takePictureIntent = null;
                 File photoFile = null;
                 try {
                     photoFile = createImageFile();
@@ -175,16 +218,17 @@ public class MainActivity extends AppCompatActivity {
                     mCameraPhotoPath = "file:" + photoFile.getAbsolutePath();
                     Uri photoURI = FileProvider.getUriForFile(MainActivity.this,
                             getPackageName() + ".fileprovider", photoFile);
+                    takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                     takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
                     takePictureIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 }
 
                 Intent contentSelectionIntent = new Intent(Intent.ACTION_GET_CONTENT);
                 contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE);
-                contentSelectionIntent.setType("image/*");
+                contentSelectionIntent.setType(isImageRequest ? "image/*" : "*/*");
 
                 Intent[] intentArray;
-                if (photoFile != null) {
+                if (takePictureIntent != null) {
                     intentArray = new Intent[]{takePictureIntent};
                 } else {
                     intentArray = new Intent[0];
@@ -200,8 +244,8 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Load the main tailor management application
-        webView.loadUrl(APP_ONLINE_URL);
+        // Load the embedded offline application bundled in APK assets
+        webView.loadUrl(APP_LOCAL_FALLBACK);
     }
 
     private File createImageFile() throws IOException {
@@ -299,6 +343,60 @@ public class MainActivity extends AppCompatActivity {
                     } catch (Exception e) {
                         Log.e(TAG, "Native print error", e);
                         Toast.makeText(MainActivity.this, "প্রিন্টার চালু করা যায়নি: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+
+        /**
+         * 1b. Dedicated Isolated HTML Printing
+         * Renders target invoice or Karigar ledger in an off-screen WebView and invokes PrintManager.
+         * Ensures 100% clean A4 print without application UI, modals, or cutoffs.
+         */
+        @JavascriptInterface
+        public void printHtml(final String htmlContent, final String jobName) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        final String name = (jobName != null && !jobName.trim().isEmpty())
+                                ? jobName.trim()
+                                : "Jibon_Tailor_Print";
+
+                        final WebView printWebView = new WebView(MainActivity.this);
+                        WebSettings printSettings = printWebView.getSettings();
+                        printSettings.setJavaScriptEnabled(false);
+                        printSettings.setDomStorageEnabled(true);
+                        printSettings.setAllowFileAccess(true);
+                        printSettings.setAllowContentAccess(true);
+
+                        printWebView.setWebViewClient(new WebViewClient() {
+                            @Override
+                            public void onPageFinished(WebView view, String url) {
+                                try {
+                                    PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+                                    if (printManager != null) {
+                                        PrintDocumentAdapter printAdapter;
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                            printAdapter = view.createPrintDocumentAdapter(name);
+                                        } else {
+                                            printAdapter = view.createPrintDocumentAdapter();
+                                        }
+                                        PrintAttributes.Builder builder = new PrintAttributes.Builder();
+                                        builder.setMediaSize(PrintAttributes.MediaSize.ISO_A4);
+                                        builder.setColorMode(PrintAttributes.COLOR_MODE_COLOR);
+                                        printManager.print(name, printAdapter, builder.build());
+                                    }
+                                } catch (Exception ex) {
+                                    Log.e(TAG, "printHtml onPageFinished error", ex);
+                                }
+                            }
+                        });
+
+                        printWebView.loadDataWithBaseURL("file:///android_asset/web/", htmlContent, "text/html", "UTF-8", null);
+                    } catch (Exception e) {
+                        Log.e(TAG, "printHtml init error", e);
+                        Toast.makeText(MainActivity.this, "প্রিন্ট শুরু করা যায়নি: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 }
             });
@@ -556,6 +654,108 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
             return true;
+        }
+
+        /**
+         * 6. Native Data Backup JSON Save & Share
+         * Saves JSON to Downloads/JibonTailor directory, shows Toast notice,
+         * and triggers system Share sheet so user can save to Drive, WhatsApp, Files, etc.
+         */
+        @JavascriptInterface
+        public boolean saveBackupJson(final String jsonContent, final String filename) {
+            try {
+                if (jsonContent == null || jsonContent.trim().isEmpty()) {
+                    showToast("ব্যাকআপ ডাটা পাওয়া যায়নি");
+                    return false;
+                }
+
+                final byte[] jsonBytes = jsonContent.getBytes("UTF-8");
+                final String cleanFilename = (filename != null && !filename.trim().isEmpty())
+                        ? filename.trim()
+                        : "jibon_tailor_backup_" + new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date()) + ".json";
+
+                boolean success = false;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    ContentResolver resolver = getContentResolver();
+                    ContentValues contentValues = new ContentValues();
+                    contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, cleanFilename);
+                    contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "application/json");
+                    contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/JibonTailor");
+                    contentValues.put(MediaStore.MediaColumns.IS_PENDING, 1);
+
+                    Uri jsonUri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues);
+                    if (jsonUri != null) {
+                        OutputStream fos = resolver.openOutputStream(jsonUri);
+                        if (fos != null) {
+                            fos.write(jsonBytes);
+                            fos.flush();
+                            fos.close();
+                        }
+                        contentValues.clear();
+                        contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                        resolver.update(jsonUri, contentValues, null, null);
+                        success = true;
+                    }
+                } else {
+                    File downloadsDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "JibonTailor");
+                    if (!downloadsDir.exists()) {
+                        downloadsDir.mkdirs();
+                    }
+                    File jsonFile = new File(downloadsDir, cleanFilename);
+                    FileOutputStream fos = new FileOutputStream(jsonFile);
+                    fos.write(jsonBytes);
+                    fos.flush();
+                    fos.close();
+
+                    MediaScannerConnection.scanFile(MainActivity.this,
+                            new String[]{jsonFile.getAbsolutePath()},
+                            new String[]{"application/json"}, null);
+                    success = true;
+                }
+
+                if (success) {
+                    showToast("✅ ব্যাকআপ ফাইল Downloads ফোল্ডারে সংরক্ষিত হয়েছে (" + cleanFilename + ")");
+
+                    // Also make a cache copy and launch system share sheet (Google Drive, WhatsApp, Files)
+                    try {
+                        File cacheDir = new File(getCacheDir(), "shared_backups");
+                        if (!cacheDir.exists()) cacheDir.mkdirs();
+                        File shareFile = new File(cacheDir, cleanFilename);
+                        FileOutputStream fos = new FileOutputStream(shareFile);
+                        fos.write(jsonBytes);
+                        fos.flush();
+                        fos.close();
+
+                        final Uri shareUri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", shareFile);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                                    shareIntent.setType("application/json");
+                                    shareIntent.putExtra(Intent.EXTRA_STREAM, shareUri);
+                                    shareIntent.putExtra(Intent.EXTRA_SUBJECT, cleanFilename);
+                                    shareIntent.putExtra(Intent.EXTRA_TEXT, "জীবন টেইলার ব্যাকআপ ফাইল (" + cleanFilename + ")");
+                                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                    Intent chooser = Intent.createChooser(shareIntent, "ব্যাকআপ ফাইল সংরক্ষণ বা শেয়ার করুন (Drive/WhatsApp/Files)");
+                                    startActivity(chooser);
+                                } catch (Exception ex) {
+                                    Log.e(TAG, "Share backup error", ex);
+                                }
+                            }
+                        });
+                    } catch (Exception ex) {
+                        Log.w(TAG, "Cache share backup copy error", ex);
+                    }
+                } else {
+                    showToast("ব্যাকআপ ফাইল সংরক্ষণ করা যায়নি");
+                }
+                return success;
+            } catch (Exception e) {
+                Log.e(TAG, "Save backup error", e);
+                showToast("ব্যাকআপ ফাইলে সমস্যা: " + e.getMessage());
+                return false;
+            }
         }
 
         private byte[] decodeBase64(String input) {

@@ -8,8 +8,10 @@
 export interface AndroidNativeInterface {
   isNativeApp?: () => boolean;
   printDocument?: (jobName: string) => void;
+  printHtml?: (htmlContent: string, jobName: string) => void;
   saveImageBase64?: (base64Data: string, filename: string, title?: string) => boolean;
   savePdfBase64?: (base64Data: string, filename: string) => boolean;
+  saveBackupJson?: (jsonContent: string, filename: string) => boolean;
   shareImageWhatsApp?: (
     base64Data: string,
     filename: string,
@@ -70,6 +72,23 @@ export function nativePrint(jobName?: string): boolean {
       return true;
     } catch (e) {
       console.warn('[NativeBridge] Print error:', e);
+    }
+  }
+  return false;
+}
+
+/**
+ * 1b. Native Android Isolated HTML Printing
+ * Sends dedicated HTML content directly to native PrintManager via offscreen WebView.
+ */
+export function nativePrintHtml(htmlContent: string, jobName?: string): boolean {
+  const bridge = getNativeBridge();
+  if (bridge && typeof bridge.printHtml === 'function') {
+    try {
+      bridge.printHtml(htmlContent, jobName || 'Jibon_Tailor_Print');
+      return true;
+    } catch (e) {
+      console.warn('[NativeBridge] PrintHtml error:', e);
     }
   }
   return false;
@@ -139,6 +158,22 @@ export function nativeShareGeneral(
       return bridge.shareImageGeneral(base64Data, filename, captionText || '');
     } catch (e) {
       console.warn('[NativeBridge] General share error:', e);
+    }
+  }
+  return false;
+}
+
+/**
+ * 6. Native Data Backup Save to Android Downloads folder
+ * Saves JSON file into Downloads/JibonTailor and initiates system share
+ */
+export function nativeSaveBackup(jsonContent: string, filename: string): boolean {
+  const bridge = getNativeBridge();
+  if (bridge && typeof bridge.saveBackupJson === 'function') {
+    try {
+      return bridge.saveBackupJson(jsonContent, filename);
+    } catch (e) {
+      console.warn('[NativeBridge] Save backup JSON error:', e);
     }
   }
   return false;

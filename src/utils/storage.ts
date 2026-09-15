@@ -1,5 +1,6 @@
 import { Shop, Invoice, TailorRecord, Expense, CatalogItem, Measurement, BackupData, AppData, Language } from '../types';
 import { initialShops, initialCatalogItems, initialInvoices, initialTailorRecords, initialExpenses } from '../data/initialData';
+import { isAndroidNativeApp, nativeSaveBackup } from './nativeBridge';
 
 const STORAGE_KEYS = {
   SHOPS: 'jibon_tailor_shops',
@@ -43,7 +44,14 @@ export const saveStoredData = (data: AppData) => {
   saveStoredLanguage(data.language);
 };
 
-export const exportDataToJson = (data: AppData) => {
+export interface BackupExportResult {
+  success: boolean;
+  filename: string;
+  isNative: boolean;
+  message?: string;
+}
+
+export const exportDataToJson = async (data: AppData): Promise<BackupExportResult> => {
   const backup: BackupData = {
     version: 1,
     exportedAt: Date.now(),
@@ -56,13 +64,75 @@ export const exportDataToJson = (data: AppData) => {
     measurements: data.measurements,
   };
   const jsonStr = JSON.stringify(backup, null, 2);
-  const blob = new Blob([jsonStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `jibon_tailor_backup_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const dateStr = new Date().toISOString().split('T')[0];
+  const filename = `jibon_tailor_backup_${dateStr}.json`;
+
+  // 1. Android APK Native Bridge
+  if (isAndroidNativeApp()) {
+    const saved = nativeSaveBackup(jsonStr, filename);
+    if (saved) {
+      return {
+        success: true,
+        filename,
+        isNative: true,
+        message: `ব্যাকআপ ফাইল "${filename}" সফলভাবে ডাউনলোড ও সেভ করা হয়েছে`,
+      };
+    }
+  }
+
+  // 2. Browser Environment Fallback
+  try {
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+
+    // Web Share API support check on modern mobile browsers
+    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+      try {
+        const file = new File([blob], filename, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Jibon Tailor Backup',
+            text: `জীবন টেইলার ব্যাকআপ ডাটা (${dateStr})`,
+          });
+          return {
+            success: true,
+            filename,
+            isNative: false,
+            message: `ব্যাকআপ ফাইল "${filename}" শেয়ার ও সেভ করা হয়েছে`,
+          };
+        }
+      } catch (shareErr: any) {
+        if (shareErr.name === 'AbortError') {
+          return {
+            success: true,
+            filename,
+            isNative: false,
+            message: `ব্যাকআপ ফাইল প্রস্তুত হয়েছে`,
+          };
+        }
+      }
+    }
+
+    // Standard HTML5 Download anchor
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    return {
+      success: true,
+      filename,
+      isNative: false,
+      message: `ব্যাকআপ ফাইল "${filename}" সফলভাবে ডাউনলোড হয়েছে`,
+    };
+  } catch (err: any) {
+    console.error('Failed to export backup:', err);
+    throw new Error(err?.message || 'Failed to export backup');
+  }
 };
 
 export const importDataFromJson = (file: File): Promise<AppData> => {
@@ -312,9 +382,9 @@ export const saveTailorRecords = (records: TailorRecord[]) => saveStoredTailorRe
 export const loadExpenses = (): Expense[] => getStoredExpenses();
 export const saveExpenses = (expenses: Expense[]) => saveStoredExpenses(expenses);
 
-export const exportFullBackupJson = () => {
+export const exportFullBackupJson = async (): Promise<BackupExportResult> => {
   const data = getStoredData();
-  exportDataToJson(data);
+  return await exportDataToJson(data);
 };
 
 export const getStoredAdminPin = (): string => {

@@ -53,6 +53,8 @@ import {
   Sliders,
   SunMedium,
   Menu,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface SettingsScreenProps {
@@ -132,7 +134,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [expenseCategories, setExpenseCategories] = useState<string[]>(getStoredExpenseCategories);
   const [newExpenseCategory, setNewExpenseCategory] = useState('');
 
+  const [isExportingBackup, setIsExportingBackup] = useState(false);
   const restoreFileRef = useRef<HTMLInputElement | null>(null);
+
+  const handleExportBackupClick = async () => {
+    setIsExportingBackup(true);
+    try {
+      if (onExportBackup) {
+        await onExportBackup();
+      }
+    } finally {
+      setIsExportingBackup(false);
+    }
+  };
 
   // Handlers
   const handleShopSubmit = (e: React.FormEvent) => {
@@ -1735,11 +1749,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 </div>
                 <div className="pt-4">
                   <button
-                    onClick={onExportBackup}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold shadow-sm transition"
+                    onClick={handleExportBackupClick}
+                    disabled={isExportingBackup}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-800 hover:bg-emerald-900 disabled:bg-emerald-700 text-white text-xs font-bold shadow-sm transition"
                   >
-                    <Download className="h-4 w-4" />
-                    <span>{isEn ? 'Download Backup File' : 'ব্যাকআপ ফাইল ডাউনলোড করুন'}</span>
+                    {isExportingBackup ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>{isEn ? 'Generating Backup...' : 'ব্যাকআপ তৈরি ও ডাউনলোড হচ্ছে...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4" />
+                        <span>{isEn ? 'Download Backup File' : 'ব্যাকআপ ফাইল ডাউনলোড করুন'}</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1754,14 +1778,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   <p className="text-xs text-slate-600 mt-1">
                     {isEn
                       ? 'Restore previous data from a previously downloaded .json backup file.'
-                      : 'পূর্বের ডাউনলোড করা .json ব্যাকআপ ফাইল আপলোড করে পূর্বের অবস্থায় ফিরে যান।'}
+                      : 'পূর্বের ডাউনলোড করা .json ব্যাকআপ ফাইল সিলেক্ট করে পূর্বের অবস্থায় ফিরে যান।'}
                   </p>
                 </div>
                 <div className="pt-4">
                   <input
                     type="file"
                     ref={restoreFileRef}
-                    accept=".json"
+                    accept=".json,application/json,text/plain"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -1776,10 +1800,28 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold shadow-sm transition"
                   >
                     <Upload className="h-4 w-4" />
-                    <span>{isEn ? 'Upload & Restore File' : 'ফাইল আপলোড ও রিস্টোর করুন'}</span>
+                    <span>{isEn ? 'Select & Restore File' : 'ফাইল নির্বাচন ও রিস্টোর করুন'}</span>
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Notice & Instructions Banner */}
+            <div className="mt-6 p-4 rounded-xl bg-emerald-50/90 border border-emerald-200 text-emerald-950 text-xs leading-relaxed space-y-2">
+              <div className="font-bold flex items-center gap-2 text-emerald-900 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
+                <span>{isEn ? 'Important Notice for Backup & Restore' : 'জরুরি ব্যাকআপ ও রিস্টোর নোটিশ'}</span>
+              </div>
+              <p className="text-slate-700">
+                {isEn
+                  ? '• Data Backup: Tapping "Download Backup File" automatically saves a safe .json copy of all your orders, invoices, tailor wage ledgers, and expenses into your device Downloads folder. On Android, a share sheet also opens so you can immediately save to Google Drive or send to WhatsApp.'
+                  : '• ডাটা ব্যাকআপ: "ব্যাকআপ ফাইল ডাউনলোড করুন" বাটনে ট্যাপ করলে স্বয়ংক্রিয়ভাবে একটি .json ফাইল আপনার ডিভাইসের Downloads ফোল্ডারে সংরক্ষিত হবে। অ্যান্ড্রয়েড অ্যাপে সাথে সাথে নোটিশ আসবে এবং Google Drive বা WhatsApp এও সেভ করে রাখার অপশন পাবেন।'}
+              </p>
+              <p className="text-slate-700">
+                {isEn
+                  ? '• Data Restore: Tapping "Select & Restore File" opens your phone file manager. Select your previously downloaded .json backup file to instantly restore all shop records.'
+                  : '• ডাটা রিস্টোর: "ফাইল নির্বাচন ও রিস্টোর করুন" বাটনে ট্যাপ করলে আপনার ফোনের ফাইল ম্যানেজার বা ডাউনলোড ফোল্ডার ওপেন হবে। সেখান থেকে আপনার পূর্বের সংরক্ষিত .json ব্যাকআপ ফাইলটি সিলেক্ট করলেই সাথে সাথে সকল হিসাব রিস্টোর হয়ে যাবে।'}
+              </p>
             </div>
           </div>
         </div>

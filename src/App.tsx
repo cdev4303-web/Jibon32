@@ -281,6 +281,32 @@ export function App() {
     showNotification(lang === 'EN' ? 'Expense entry deleted' : 'খরচ এন্ট্রি মুছে ফেলা হয়েছে', 'info');
   };
 
+  // Backup Export with Notification Notice
+  const handleExportBackup = async () => {
+    try {
+      showNotification(
+        lang === 'EN' ? 'Preparing backup file...' : 'ব্যাকআপ ফাইল প্রস্তুত করা হচ্ছে...',
+        'info'
+      );
+      const result = await exportFullBackupJson();
+      if (result && result.success) {
+        showNotification(
+          lang === 'EN'
+            ? `Backup file "${result.filename}" exported & saved successfully!`
+            : `ব্যাকআপ ফাইল "${result.filename}" সফলভাবে ডাউনলোড ও সংরক্ষিত হয়েছে!`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showNotification(
+        lang === 'EN'
+          ? `Backup failed: ${err?.message || err}`
+          : `ব্যাকআপ তৈরিতে সমস্যা হয়েছে: ${err?.message || err}`,
+        'error'
+      );
+    }
+  };
+
   // Backup Import
   const handleImportBackup = (file: File) => {
     importFullBackupJson(
@@ -805,7 +831,7 @@ export function App() {
             onOpenPrintModal={(inv) => setPrintModalInvoice(inv)}
             onDeleteInvoice={handleDeleteInvoice}
             onOpenVisualGuide={() => setIsVisualGuideOpen(true)}
-            onExportBackup={exportFullBackupJson}
+            onExportBackup={handleExportBackup}
             onImportBackup={handleImportBackup}
             onUpdateStatus={handleUpdateStatus}
             onSaveInvoice={handleSaveInvoice}
@@ -1122,7 +1148,7 @@ export function App() {
             catalogCount={catalogItems.length}
             tailorCount={tailorRecords.length}
             expensesCount={expenses.length}
-            onExportBackup={exportFullBackupJson}
+            onExportBackup={handleExportBackup}
             onImportBackup={handleImportBackup}
           />
         )}
