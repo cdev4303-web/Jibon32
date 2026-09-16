@@ -31,6 +31,7 @@ jobs:
       - name: 🔄 Sync Web Assets to Android Project
         run: |
           mkdir -p jibon/android-studio-project/app/src/main/assets/web
+          rm -rf jibon/android-studio-project/app/src/main/assets/web/*
           cp -r dist/* jibon/android-studio-project/app/src/main/assets/web/
           echo "Web assets synced successfully."
 

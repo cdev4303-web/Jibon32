@@ -20,12 +20,14 @@ import android.print.PrintManager;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
+import android.webkit.ConsoleMessage;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -36,6 +38,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.webkit.WebViewAssetLoader;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -54,8 +57,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int INPUT_FILE_REQUEST_CODE = 1001;
     private static final int PERMISSION_REQUEST_CODE = 1002;
 
-    // The live deployed cloud URL of Jibon Tailor
-    private static final String APP_ONLINE_URL = "https://ais-pre-xvaahh6dga2msv7jjvvztm-435093563543.europe-west2.run.app";
+    // Secure virtual HTTPS domain provided by AndroidX WebViewAssetLoader for 100% offline ES-module & CORS compliance
+    private static final String APP_ASSET_URL = "https://appassets.androidplatform.net/assets/web/index.html";
     // Local embedded fallback
     private static final String APP_LOCAL_FALLBACK = "file:///android_asset/web/index.html";
 
@@ -63,6 +66,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
+
+        final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
 
         webView = new WebView(this);
         setContentView(webView);
@@ -131,6 +142,15 @@ public class MainActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                WebResourceResponse response = assetLoader.shouldInterceptRequest(request.getUrl());
+                if (response != null) {
+                    return response;
+                }
+                return super.shouldInterceptRequest(view, request);
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 // If it's WhatsApp or Tel, open native intent
@@ -156,14 +176,25 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                // If network fails, load local offline fallback
                 if (request.isForMainFrame()) {
-                    view.loadUrl(APP_LOCAL_FALLBACK);
+                    Log.e(TAG, "WebView error: " + error.getDescription());
+                    // Fallback to file URL if asset loader ever encounters issues
+                    String currentUrl = view.getUrl();
+                    if (currentUrl == null || !currentUrl.startsWith("file:///")) {
+                        view.loadUrl(APP_LOCAL_FALLBACK);
+                    }
                 }
             }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+                Log.d("WebViewConsole", consoleMessage.message() + " -- Line "
+                        + consoleMessage.lineNumber() + " of " + consoleMessage.sourceId());
+                return true;
+            }
+
             // Camera, Gallery, and File Chooser (Smart handling for Backup & Images)
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
@@ -244,8 +275,8 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Load the embedded offline application bundled in APK assets
-        webView.loadUrl(APP_LOCAL_FALLBACK);
+        // Load the embedded offline application bundled in APK assets via secure asset loader
+        webView.loadUrl(APP_ASSET_URL);
     }
 
     private File createImageFile() throws IOException {
