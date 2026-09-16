@@ -138,7 +138,7 @@ button:not(:disabled) {
 }
 
 #isolated-print-target-root {
-  display: none;
+  display: none !important;
 }
 
 /* ========================================================================= */
@@ -169,7 +169,7 @@ button:not(:disabled) {
     position: static !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     background: #ffffff !important;
     color: #0f172a !important;
@@ -177,6 +177,19 @@ button:not(:disabled) {
     height: auto !important;
     box-shadow: none !important;
     border: none !important;
+  }
+
+  body.is-printing-active #isolated-print-target-root * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  body.is-printing-active #isolated-print-target-root .print\:hidden,
+  body.is-printing-active #isolated-print-target-root .print-hidden,
+  body.is-printing-active #isolated-print-target-root .no-print,
+  body.is-printing-active #isolated-print-target-root button:not(.allow-print-button) {
+    display: none !important;
   }
 
   html, body {

@@ -338,6 +338,7 @@ public class MainActivity extends AppCompatActivity {
                             PrintAttributes.Builder builder = new PrintAttributes.Builder();
                             builder.setMediaSize(PrintAttributes.MediaSize.ISO_A4);
                             builder.setColorMode(PrintAttributes.COLOR_MODE_COLOR);
+                            builder.setMinMargins(PrintAttributes.Margins.NO_MARGINS);
                             printManager.print(name, printAdapter, builder.build());
                         }
                     } catch (Exception e) {
