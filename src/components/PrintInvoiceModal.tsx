@@ -3,7 +3,7 @@ import { Invoice, Shop, Language } from '../types';
 import { Printer, X, Image as ImageIcon, Send, MessageSquareText, QrCode, FileDown, Download, Loader2, Share2 } from 'lucide-react';
 import { InvoiceImageModal } from './InvoiceImageModal';
 import { Logo } from './Logo';
-import { openWhatsAppUrl, createInvoiceWhatsAppMessage, createReadyWhatsAppMessage } from '../utils/whatsapp';
+import { openWhatsAppUrl, createInvoiceWhatsAppMessage, createReadyWhatsAppMessage, shareInvoicePngOnly } from '../utils/whatsapp';
 import { generateInvoiceQrDataUrl } from '../utils/qrcode';
 import { printHtmlElement, exportElementToPdf } from '../utils/print';
 import { captureElementToPng } from '../utils/domCapture';
@@ -29,6 +29,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
   const [qrUri, setQrUri] = useState<string>('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingPng, setIsGeneratingPng] = useState(false);
+  const [isSharingPng, setIsSharingPng] = useState(false);
 
   useEffect(() => {
     if (invoice && isOpen) {
@@ -67,7 +68,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
       let dataUri: string | null = null;
       try {
         dataUri = await captureElementToPng('printable-area', {
-          pixelRatio: 2.5,
+          pixelRatio: 2.0,
           backgroundColor: '#ffffff',
         });
       } catch (domErr) {
@@ -84,6 +85,33 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
       console.error('Failed to download invoice PNG:', err);
     } finally {
       setIsGeneratingPng(false);
+    }
+  };
+
+  const handleSharePngDirect = async () => {
+    try {
+      setIsSharingPng(true);
+      let dataUri: string | null = null;
+      try {
+        dataUri = await captureElementToPng('printable-area', {
+          pixelRatio: 2.0,
+          backgroundColor: '#ffffff',
+        });
+      } catch (domErr) {
+        console.warn('DOM capture error, falling back to canvas renderer:', domErr);
+      }
+
+      if (!dataUri || !dataUri.startsWith('data:image/png') || dataUri.length < 2500) {
+        dataUri = await generateInvoiceImageUriAsync(invoice, shop, (lang as 'EN' | 'BN') || 'BN');
+      }
+
+      if (dataUri) {
+        await shareInvoicePngOnly(invoice, dataUri);
+      }
+    } catch (err) {
+      console.error('Failed to share invoice PNG:', err);
+    } finally {
+      setIsSharingPng(false);
     }
   };
 
@@ -156,17 +184,19 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                 <span>{isGeneratingPdf ? (lang === 'EN' ? 'Creating...' : 'তৈরি হচ্ছে...') : (lang === 'EN' ? 'Download PDF' : 'PDF ডাউনলোড')}</span>
               </button>
 
-              {/* WhatsApp PNG Button - Vibrant Emerald */}
+              {/* Share PNG Button - Direct share pure PNG to all platforms (Zero text) */}
               <button
-                onClick={() => {
-                  setIsReadyMode(false);
-                  setIsImageModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition active:scale-95"
-                title={lang === 'EN' ? 'WhatsApp Image Generator' : 'হোয়াটসঅ্যাপ ইমেজ জেনারেটর'}
+                onClick={handleSharePngDirect}
+                disabled={isSharingPng}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition active:scale-95 disabled:opacity-50"
+                title={lang === 'EN' ? 'Share pure PNG to any app (WhatsApp, Messenger, Bluetooth, etc.)' : 'সব অ্যাপে শুধু PNG ছবি শেয়ার করুন (লিখা ছাড়া)'}
               >
-                <ImageIcon className="h-3.5 w-3.5" />
-                <span>WhatsApp PNG</span>
+                {isSharingPng ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Share2 className="h-3.5 w-3.5" />
+                )}
+                <span>{isSharingPng ? (lang === 'EN' ? 'Sharing...' : 'শেয়ার হচ্ছে...') : (lang === 'EN' ? 'Share PNG' : 'শেয়ার PNG')}</span>
               </button>
 
               {/* Ready Alert Button - Vibrant Teal */}
@@ -483,14 +513,17 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
               )}
 
               <button
-                onClick={() => {
-                  setIsReadyMode(invoice.orderStatus === 'Ready for Pickup');
-                  setIsImageModalOpen(true);
-                }}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 px-3 text-xs font-bold text-white shadow-md transition active:scale-95 border border-emerald-400"
+                onClick={handleSharePngDirect}
+                disabled={isSharingPng}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 px-3 text-xs font-bold text-white shadow-md transition active:scale-95 border border-emerald-400 disabled:opacity-50"
+                title={lang === 'EN' ? 'Share pure PNG to any app (zero text)' : 'সব অ্যাপে শুধু PNG ছবি শেয়ার করুন (লিখা ছাড়া)'}
               >
-                <Share2 className="h-4 w-4 shrink-0" />
-                <span>{lang === 'EN' ? 'Share Invoice (PNG)' : 'ইনভয়েস শেয়ার (PNG)'}</span>
+                {isSharingPng ? (
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                ) : (
+                  <Share2 className="h-4 w-4 shrink-0" />
+                )}
+                <span>{isSharingPng ? (lang === 'EN' ? 'Sharing...' : 'শেয়ার হচ্ছে...') : (lang === 'EN' ? 'Share PNG' : 'ইনভয়েস শেয়ার (PNG)')}</span>
               </button>
             </div>
 

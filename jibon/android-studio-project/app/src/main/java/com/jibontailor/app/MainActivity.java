@@ -4,11 +4,14 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
+import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import java.util.List;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
@@ -579,13 +582,18 @@ public class MainActivity extends AppCompatActivity {
          */
         @JavascriptInterface
         public boolean shareImageWhatsApp(final String base64Data, final String filename, final String phoneNumber, final String captionText) {
-            runOnUiThread(new Runnable() {
+            new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         byte[] imageBytes = decodeBase64(base64Data);
                         if (imageBytes == null || imageBytes.length == 0) {
-                            showToast("ছবি প্রসেস করা যায়নি");
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    showToast("ছবি প্রসেস করা যায়নি");
+                                }
+                            });
                             return;
                         }
 
@@ -593,7 +601,6 @@ public class MainActivity extends AppCompatActivity {
                                 ? filename.trim()
                                 : "Invoice_Share_" + System.currentTimeMillis() + ".png";
 
-                        // Save temporarily to cache directory for FileProvider sharing
                         File cacheDir = new File(getCacheDir(), "shared_images");
                         if (!cacheDir.exists()) {
                             cacheDir.mkdirs();
@@ -604,62 +611,106 @@ public class MainActivity extends AppCompatActivity {
                         fos.flush();
                         fos.close();
 
-                        Uri contentUri = FileProvider.getUriForFile(
+                        final Uri contentUri = FileProvider.getUriForFile(
                                 MainActivity.this,
                                 getPackageName() + ".fileprovider",
                                 imageFile
                         );
 
-                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                        final Intent shareIntent = new Intent(Intent.ACTION_SEND);
                         shareIntent.setType("image/png");
                         shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                        shareIntent.setClipData(ClipData.newRawUri("Invoice PNG", contentUri));
                         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
                         if (captionText != null && !captionText.trim().isEmpty()) {
                             shareIntent.putExtra(Intent.EXTRA_TEXT, captionText.trim());
                         }
 
-                        // Check if WhatsApp is installed
+                        // Check if WhatsApp or WhatsApp Business is installed
                         boolean isWhatsAppInstalled = isPackageInstalled("com.whatsapp");
                         boolean isWhatsAppBusinessInstalled = isPackageInstalled("com.whatsapp.w4b");
 
+                        Intent targetIntent = shareIntent;
                         if (isWhatsAppInstalled) {
-                            shareIntent.setPackage("com.whatsapp");
+                            targetIntent.setPackage("com.whatsapp");
+                            grantUriPermission("com.whatsapp", contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
                         } else if (isWhatsAppBusinessInstalled) {
-                            shareIntent.setPackage("com.whatsapp.w4b");
+                            targetIntent.setPackage("com.whatsapp.w4b");
+                            grantUriPermission("com.whatsapp.w4b", contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        } else {
+                            // Fallback to system chooser for all apps
+                            targetIntent = Intent.createChooser(shareIntent, "ইনভয়েস শেয়ার করুন");
+                            targetIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            targetIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            try {
+                                List<ResolveInfo> resInfoList = getPackageManager().queryIntentActivities(shareIntent, PackageManager.MATCH_DEFAULT_ONLY);
+                                for (ResolveInfo resolveInfo : resInfoList) {
+                                    grantUriPermission(resolveInfo.activityInfo.packageName, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                }
+                            } catch (Exception ignored) {}
                         }
 
-                        try {
-                            startActivity(shareIntent);
-                        } catch (Exception ex) {
-                            // Fallback to general system chooser
-                            Intent chooser = Intent.createChooser(shareIntent, "WhatsApp বা অন্যান্য অ্যাপে ইনভয়েস শেয়ার করুন");
-                            startActivity(chooser);
-                        }
+                        final Intent finalIntent = targetIntent;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    startActivity(finalIntent);
+                                } catch (Exception ex) {
+                                    Log.e(TAG, "WhatsApp share error, falling back to chooser", ex);
+                                    shareIntent.setPackage(null);
+                                    Intent chooser = Intent.createChooser(shareIntent, "ইনভয়েস শেয়ার করুন");
+                                    chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    try {
+                                        startActivity(chooser);
+                                    } catch (Exception ex2) {
+                                        showToast("শেয়ার অ্যাপ খুলতে ব্যর্থ: " + ex2.getMessage());
+                                    }
+                                }
+                            }
+                        });
                     } catch (Exception e) {
                         Log.e(TAG, "WhatsApp share error", e);
-                        showToast("WhatsApp শেয়ার করতে সমস্যা: " + e.getMessage());
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                showToast("WhatsApp শেয়ার করতে সমস্যা: " + e.getMessage());
+                            }
+                        });
                     }
                 }
-            });
+            }).start();
             return true;
         }
 
         /**
-         * General Image Sharing via Android System Chooser
+         * General Image Sharing via Android System Chooser to ANY platform
+         * (WhatsApp, Messenger, Facebook, IMO, Telegram, Bluetooth, Google Drive, Email, etc.)
+         * When captionText is null or empty, it strictly shares ONLY the PNG image without any text.
          */
         @JavascriptInterface
         public boolean shareImageGeneral(final String base64Data, final String filename, final String captionText) {
-            runOnUiThread(new Runnable() {
+            new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         byte[] imageBytes = decodeBase64(base64Data);
-                        if (imageBytes == null || imageBytes.length == 0) return;
+                        if (imageBytes == null || imageBytes.length == 0) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    showToast("ছবি প্রসেস করা সম্ভব হয়নি");
+                                }
+                            });
+                            return;
+                        }
 
                         String cleanFilename = (filename != null && !filename.trim().isEmpty())
                                 ? filename.trim()
-                                : "Share_" + System.currentTimeMillis() + ".png";
+                                : "Jibon_Tailor_Invoice_" + System.currentTimeMillis() + ".png";
 
                         File cacheDir = new File(getCacheDir(), "shared_images");
                         if (!cacheDir.exists()) cacheDir.mkdirs();
@@ -669,23 +720,71 @@ public class MainActivity extends AppCompatActivity {
                         fos.flush();
                         fos.close();
 
-                        Uri contentUri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", imageFile);
+                        final Uri contentUri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", imageFile);
 
-                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                        final Intent shareIntent = new Intent(Intent.ACTION_SEND);
                         shareIntent.setType("image/png");
                         shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                        shareIntent.setClipData(ClipData.newRawUri("Invoice PNG", contentUri));
                         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        if (captionText != null && !captionText.isEmpty()) {
-                            shareIntent.putExtra(Intent.EXTRA_TEXT, captionText);
+                        shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                        // Strict requirement: Only attach text if explicitly provided and non-empty.
+                        // If empty, shares ONLY the PNG image without text/captions.
+                        if (captionText != null && !captionText.trim().isEmpty()) {
+                            shareIntent.putExtra(Intent.EXTRA_TEXT, captionText.trim());
                         }
 
-                        startActivity(Intent.createChooser(shareIntent, "ছবি শেয়ার করুন"));
+                        final Intent chooser = Intent.createChooser(shareIntent, "শেয়ার করুন (Share PNG)");
+                        chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                        // Grant read permission to all matching activities
+                        try {
+                            List<ResolveInfo> resInfoList = getPackageManager().queryIntentActivities(shareIntent, PackageManager.MATCH_DEFAULT_ONLY);
+                            for (ResolveInfo resolveInfo : resInfoList) {
+                                String packageName = resolveInfo.activityInfo.packageName;
+                                grantUriPermission(packageName, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            }
+                        } catch (Exception ex) {
+                            Log.w(TAG, "grantUriPermission query error", ex);
+                        }
+
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    startActivity(chooser);
+                                } catch (Exception e) {
+                                    Log.e(TAG, "start chooser error", e);
+                                    try {
+                                        startActivity(shareIntent);
+                                    } catch (Exception e2) {
+                                        showToast("শেয়ার অ্যাপ চালু করা যায়নি: " + e2.getMessage());
+                                    }
+                                }
+                            }
+                        });
                     } catch (Exception e) {
                         Log.e(TAG, "Share general error", e);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                showToast("শেয়ার করতে সমস্যা হয়েছে: " + e.getMessage());
+                            }
+                        });
                     }
                 }
-            });
+            }).start();
             return true;
+        }
+
+        /**
+         * Dedicated Pure PNG Sharing (Zero text, zero caption) to any platform
+         */
+        @JavascriptInterface
+        public boolean shareImagePngOnly(final String base64Data, final String filename) {
+            return shareImageGeneral(base64Data, filename, "");
         }
 
         /**
@@ -792,11 +891,11 @@ public class MainActivity extends AppCompatActivity {
 
         private byte[] decodeBase64(String input) {
             if (input == null) return null;
-            String clean = input;
-            if (clean.contains(",")) {
-                clean = clean.substring(clean.indexOf(",") + 1);
+            String clean = input.trim();
+            int commaIdx = clean.indexOf(',');
+            if (commaIdx >= 0) {
+                clean = clean.substring(commaIdx + 1);
             }
-            clean = clean.replaceAll("\\s+", "");
             return Base64.decode(clean, Base64.DEFAULT);
         }
 

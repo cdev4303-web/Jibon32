@@ -38,7 +38,7 @@ export async function captureElementToPng(
     defaultWidth = 880;
   }
   const targetWidth = options.width || defaultWidth;
-  const pixelRatio = options.pixelRatio || 2.5;
+  const pixelRatio = options.pixelRatio || 2.0;
   const backgroundColor = options.backgroundColor || '#ffffff';
 
   // 1. Create a clean offscreen mount sandbox attached to document.body

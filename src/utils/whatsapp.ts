@@ -1,5 +1,6 @@
 import { Invoice, Shop, CatalogItem, Language } from '../types';
-import { isAndroidNativeApp, nativeShareWhatsApp } from './nativeBridge';
+import { isAndroidNativeApp, nativeShareWhatsApp, nativeSharePngOnly, nativeShareGeneral } from './nativeBridge';
+import { downloadImageFromUri } from './invoiceImage';
 
 export const cleanPhoneNumber = (phone: string): string => {
   if (!phone) return '';
@@ -260,6 +261,99 @@ export const shareInvoicePngToWhatsApp = async (
 
   openWhatsAppUrl(invoice.customerPhone, message);
   return true;
+};
+
+/**
+ * Shares an invoice PNG image strictly without any text/caption to all platforms
+ * (WhatsApp, Messenger, Facebook, IMO, Telegram, Bluetooth, Google Drive, Email, etc.)
+ * via Android System Chooser (Intent.createChooser) or Web Share API (navigator.share).
+ * Fully satisfies user requirement: "শেয়ার pngবাটনে ট্যাপ করলে যেন অন্য প্লাটফর্মে শেয়ার করা যায় শুধু png ,লিখা ছাড়া।"
+ */
+export const shareInvoicePngOnly = async (
+  invoice: Invoice,
+  imageUri: string
+): Promise<boolean> => {
+  const sanitized = (invoice.customerName || 'Customer').replace(/[^a-zA-Z0-9_\u0980-\u09FF]/g, '_');
+  const filename = `Invoice_${invoice.id}_${sanitized}.png`;
+
+  // 1. Android APK Native Chooser: Pure PNG file, ZERO text/caption to all platforms
+  if (isAndroidNativeApp()) {
+    try {
+      const shared = nativeSharePngOnly(imageUri, filename);
+      if (shared) {
+        return true;
+      }
+    } catch (bridgeErr) {
+      console.warn('[SharePngOnly] Native share failed, falling back to web flow:', bridgeErr);
+    }
+  }
+
+  // 2. Web Share API: Pure PNG file ONLY, zero text/caption
+  try {
+    const file = await dataUriToFile(imageUri, filename);
+    if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+      });
+      return true;
+    }
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      return true; // User intentionally dismissed the share sheet
+    }
+    console.warn('Native file share failed or canceled, falling back to download:', err);
+  }
+
+  // 3. Fallback: Save/Download the clean PNG file directly
+  try {
+    downloadImageFromUri(imageUri, filename);
+    return true;
+  } catch (downloadErr) {
+    console.warn('Download fallback failed:', downloadErr);
+    return false;
+  }
+};
+
+/**
+ * Shares a catalog item PNG image strictly without any text/caption to all platforms
+ */
+export const shareCatalogPngOnly = async (
+  item: CatalogItem,
+  imageUri: string
+): Promise<boolean> => {
+  const sanitized = item.name.replace(/[^a-zA-Z0-9_\u0980-\u09FF]/g, '_');
+  const filename = `Catalog_${item.catalogCode}_${sanitized}.png`;
+
+  if (isAndroidNativeApp()) {
+    try {
+      const shared = nativeSharePngOnly(imageUri, filename);
+      if (shared) {
+        return true;
+      }
+    } catch (bridgeErr) {
+      console.warn('[CatalogShare] Native share failed, falling back to web flow:', bridgeErr);
+    }
+  }
+
+  try {
+    const file = await dataUriToFile(imageUri, filename);
+    if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+      });
+      return true;
+    }
+  } catch (err: any) {
+    if (err?.name === 'AbortError') return true;
+    console.warn('Native file share for catalog failed, falling back:', err);
+  }
+
+  try {
+    downloadImageFromUri(imageUri, filename);
+    return true;
+  } catch (err) {
+    return false;
+  }
 };
 
 /**

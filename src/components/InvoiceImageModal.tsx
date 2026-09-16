@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Invoice, Shop, Language } from '../types';
 import { generateInvoiceImageUriAsync, downloadImageFromUri } from '../utils/invoiceImage';
-import { shareInvoicePngToWhatsApp, openWhatsAppUrl, createReadyWhatsAppMessage } from '../utils/whatsapp';
+import { shareInvoicePngToWhatsApp, shareInvoicePngOnly, openWhatsAppUrl, createReadyWhatsAppMessage } from '../utils/whatsapp';
 import { Download, X, Share2, CheckCircle2, Image as ImageIcon, Smartphone, Loader2, MessageSquareText } from 'lucide-react';
 
 interface InvoiceImageModalProps {
@@ -82,6 +82,18 @@ export const InvoiceImageModal: React.FC<InvoiceImageModalProps> = ({
     }
   };
 
+  const handleSharePngOnly = async () => {
+    if (!imageUri) return;
+    setSharing(true);
+    try {
+      await shareInvoicePngOnly(invoice, imageUri);
+    } catch (e) {
+      console.warn(e);
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-sm">
       <div className="relative flex max-h-[95vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
@@ -155,20 +167,38 @@ export const InvoiceImageModal: React.FC<InvoiceImageModalProps> = ({
 
         {/* Footer Actions */}
         <div className="border-t border-slate-200 bg-white p-3.5 flex flex-col sm:flex-row items-center gap-2">
-          {/* WhatsApp Button - Emerald */}
+          {/* Share PNG Button (Pure PNG, No text, all platforms) - Emerald */}
+          <button
+            onClick={() => handleSharePngOnly()}
+            disabled={!imageUri || sharing}
+            className="w-full sm:flex-[1.5] flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 py-2.5 text-xs font-black text-slate-950 shadow-md transition active:scale-95 disabled:opacity-50 border-2 border-emerald-300"
+            title={lang === 'EN' ? 'Share PNG image to any app (Zero text)' : 'সব অ্যাপে শুধু PNG ছবি শেয়ার করুন (লিখা ছাড়া)'}
+          >
+            {sharing ? (
+              <Loader2 className="h-4 w-4 animate-spin text-slate-950" />
+            ) : (
+              <Share2 className="h-4 w-4 text-slate-950" />
+            )}
+            <span>
+              {sharing
+                ? lang === 'EN'
+                  ? 'Sharing...'
+                  : 'শেয়ার হচ্ছে...'
+                : lang === 'EN'
+                ? 'Share PNG (All Apps)'
+                : 'শেয়ার PNG (সব অ্যাপ)'}
+            </span>
+          </button>
+
+          {/* WhatsApp Direct Button */}
           <button
             onClick={() => handleWhatsAppSend()}
             disabled={!imageUri || sharing}
-            className="w-full sm:flex-[1.5] flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 py-2.5 text-xs font-black text-slate-950 shadow-md transition active:scale-95 disabled:opacity-50"
+            className="w-full sm:flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white py-2.5 text-xs font-bold shadow-md transition active:scale-95 disabled:opacity-50"
+            title={lang === 'EN' ? 'Send invoice to customer WhatsApp' : 'কাস্টমারের হোয়াটসঅ্যাপে ইনভয়েস পাঠান'}
           >
-            <Share2 className="h-4 w-4 text-slate-950" />
-            {sharing
-              ? lang === 'EN'
-                ? 'Sending...'
-                : 'পাঠানো হচ্ছে...'
-              : lang === 'EN'
-              ? 'Send Invoice via WhatsApp'
-              : 'WhatsApp এ ইনভয়েস পাঠান'}
+            <Smartphone className="h-4 w-4" />
+            <span>{lang === 'EN' ? 'WhatsApp' : 'WhatsApp'}</span>
           </button>
 
           {/* Ready Alert Button - Teal (Text Only to customer mobile number) */}
@@ -183,7 +213,7 @@ export const InvoiceImageModal: React.FC<InvoiceImageModalProps> = ({
               }
             >
               <MessageSquareText className="h-4 w-4" />
-              {lang === 'EN' ? 'Ready Alert' : 'কাপড় রেডি মেসেজ'}
+              {lang === 'EN' ? 'Ready Alert' : 'কাপড় রেডি'}
             </button>
           )}
 

@@ -23,6 +23,10 @@ export interface AndroidNativeInterface {
     filename: string,
     captionText?: string
   ) => boolean;
+  shareImagePngOnly?: (
+    base64Data: string,
+    filename: string
+  ) => boolean;
 }
 
 declare global {
@@ -158,6 +162,35 @@ export function nativeShareGeneral(
       return bridge.shareImageGeneral(base64Data, filename, captionText || '');
     } catch (e) {
       console.warn('[NativeBridge] General share error:', e);
+    }
+  }
+  return false;
+}
+
+/**
+ * Native Image Sharing with ONLY the PNG image (Zero text/caption)
+ * Opens Android System Chooser with pure PNG file so user can share
+ * to ANY app (WhatsApp, Messenger, Facebook, IMO, Telegram, Bluetooth, Drive, etc.)
+ */
+export function nativeSharePngOnly(
+  base64Data: string,
+  filename: string
+): boolean {
+  const bridge = getNativeBridge();
+  if (bridge) {
+    if (typeof bridge.shareImagePngOnly === 'function') {
+      try {
+        return bridge.shareImagePngOnly(base64Data, filename);
+      } catch (e) {
+        console.warn('[NativeBridge] shareImagePngOnly error:', e);
+      }
+    }
+    if (typeof bridge.shareImageGeneral === 'function') {
+      try {
+        return bridge.shareImageGeneral(base64Data, filename, '');
+      } catch (e) {
+        console.warn('[NativeBridge] fallback shareImageGeneral error:', e);
+      }
     }
   }
   return false;
