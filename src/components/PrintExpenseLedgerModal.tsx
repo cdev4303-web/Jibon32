@@ -385,7 +385,7 @@ export const PrintExpenseLedgerModal: React.FC<PrintExpenseLedgerModalProps> = (
               <div>
                 <h1 className="text-2xl font-black tracking-wide text-emerald-950">{shop.name}</h1>
                 <p className="text-xs text-slate-700 mt-0.5">
-                  {shop.address} | Tel: {shop.phone} | CR: {shop.crNumber}
+                  {shop.address} | Tel: {shop.phone} | {shop.crNumber.trim().toUpperCase().startsWith('CR') ? shop.crNumber.trim() : `CR: ${shop.crNumber.trim()}`}
                 </p>
               </div>
             </div>

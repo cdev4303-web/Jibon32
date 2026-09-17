@@ -315,27 +315,48 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                   >
                     <div className="leading-snug text-emerald-100">{shop.address}</div>
                     <div
-                      className="flex items-center gap-2 sm:gap-3 mt-1 font-semibold text-xs whitespace-nowrap"
-                      style={{ whiteSpace: 'nowrap' }}
+                      className="header-contact-row flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 font-semibold text-xs"
+                      style={{
+                        whiteSpace: 'nowrap',
+                        wordBreak: 'keep-all',
+                      }}
                     >
                       <span
-                        className="whitespace-nowrap inline-flex items-center"
-                        style={{ whiteSpace: 'nowrap' }}
+                        className="inline-block"
+                        style={{
+                          whiteSpace: 'nowrap',
+                          wordBreak: 'keep-all',
+                          overflowWrap: 'normal',
+                        }}
                       >
-                        Tel:&nbsp;<strong className="text-white font-bold">{shop.phone}</strong>
+                        Tel:&nbsp;<strong
+                          className="text-white font-bold"
+                          style={{
+                            color: '#ffffff',
+                            WebkitTextFillColor: '#ffffff',
+                            whiteSpace: 'nowrap',
+                            wordBreak: 'keep-all',
+                          }}
+                        >
+                          {shop.phone.trim().replace(/ /g, '\u00A0')}
+                        </strong>
                       </span>
-                      <span className="text-emerald-300 font-bold shrink-0">•</span>
+                      <span className="text-emerald-300 font-bold shrink-0 hidden sm:inline">•</span>
                       <span
-                        className="text-amber-300 font-bold tracking-wide whitespace-nowrap inline-flex items-center"
+                        className="font-bold tracking-wide inline-block"
                         style={{
                           color: '#fde047',
                           WebkitTextFillColor: '#fde047',
                           WebkitPrintColorAdjust: 'exact',
                           printColorAdjust: 'exact',
                           whiteSpace: 'nowrap',
+                          wordBreak: 'keep-all',
+                          overflowWrap: 'normal',
                         }}
                       >
-                        CR:&nbsp;{shop.crNumber}
+                        {shop.crNumber.trim().toUpperCase().startsWith('CR')
+                          ? shop.crNumber.trim().replace(/ /g, '\u00A0').replace(/-/g, '\u2011')
+                          : `CR:\u00A0${shop.crNumber.trim().replace(/ /g, '\u00A0').replace(/-/g, '\u2011')}`}
                       </span>
                     </div>
                   </div>

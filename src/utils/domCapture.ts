@@ -70,7 +70,12 @@ export async function captureElementToPng(
     'overflow-hidden',
     'max-h-[95vh]',
     'max-h-[96vh]',
-    'h-full'
+    'h-full',
+    'max-w-3xl',
+    'max-w-2xl',
+    'max-w-xl',
+    'max-w-lg',
+    'max-w-md'
   );
   clone.style.width = `${targetWidth}px`;
   clone.style.minWidth = `${targetWidth}px`;
@@ -110,6 +115,17 @@ export async function captureElementToPng(
       h1.style.color = '#ffffff';
       (h1.style as any).webkitTextFillColor = '#ffffff';
     }
+
+    const contactRow = h.querySelector('.header-contact-row') as HTMLElement | null;
+    if (contactRow) {
+      contactRow.style.display = 'flex';
+      contactRow.style.flexWrap = 'nowrap';
+      contactRow.style.alignItems = 'center';
+      contactRow.style.gap = '10px';
+      contactRow.style.whiteSpace = 'nowrap';
+      contactRow.style.wordBreak = 'keep-all';
+    }
+
     h.querySelectorAll('div, p, span').forEach((el) => {
       const htmlEl = el as HTMLElement;
       (htmlEl.style as any).webkitPrintColorAdjust = 'exact';

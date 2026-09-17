@@ -186,7 +186,10 @@ export async function generateInvoiceImageUriAsync(
 
   ctx.fillStyle = '#FDE68A';
   ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`📞 Tel: ${shop.phone}   •   CR: ${shop.crNumber}`, (width + 50) / 2, 114);
+  const crText = shop.crNumber.trim().toUpperCase().startsWith('CR')
+    ? shop.crNumber.trim()
+    : `CR: ${shop.crNumber.trim()}`;
+  ctx.fillText(`📞 Tel: ${shop.phone}   •   ${crText}`, (width + 50) / 2, 114);
 
   // 3. Invoice Header Card
   const metaY = 175;
