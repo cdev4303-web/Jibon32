@@ -22,6 +22,7 @@ import {
   getStoredLanguage,
   saveStoredLanguage,
 } from './utils/storage';
+import { loadInvoicesFromIndexedDb } from './utils/indexedDb';
 import { strings } from './utils/strings';
 import { Logo } from './components/Logo';
 import { getHeaderTitleStyle } from './utils/headerStyle';
@@ -104,6 +105,25 @@ export function App() {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3500);
   };
+
+  // Initial IndexedDB sync (hydrates full photos and data if available)
+  useEffect(() => {
+    loadInvoicesFromIndexedDb()
+      .then((idbInvoices) => {
+        if (idbInvoices && idbInvoices.length > 0) {
+          setInvoices((prev) => {
+            // If IndexedDB has more invoices or more photo fields populated, sync smoothly
+            if (idbInvoices.length >= prev.length) {
+              return idbInvoices;
+            }
+            return prev;
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('Initial IndexedDB hydration skipped:', err);
+      });
+  }, []);
 
   // Sync state changes to storage
   useEffect(() => {

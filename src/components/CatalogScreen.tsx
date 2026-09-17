@@ -5,6 +5,7 @@ import { CameraCaptureModal } from './CameraCaptureModal';
 import { ShareCatalogCardModal } from './ShareCatalogCardModal';
 import { generateCatalogImageUriAsync } from '../utils/catalogImage';
 import { shareCatalogPngToWhatsApp } from '../utils/whatsapp';
+import { compressImageFile, compressDataUri } from '../utils/imageCompressor';
 import {
   Plus,
   Search,
@@ -128,15 +129,20 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
     setIsEditDialogOpen(false);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const uri = event.target?.result as string;
-        if (uri) setImageUri(uri);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImageFile(file, { maxWidth: 1080, maxHeight: 1080, quality: 0.72 });
+        setImageUri(compressed);
+      } catch (err) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const uri = event.target?.result as string;
+          if (uri) setImageUri(uri);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 

@@ -34,6 +34,7 @@ import {
   Bot,
 } from 'lucide-react';
 import { parseInvoiceWithAi, AiInvoiceDraft } from '../utils/aiInvoiceParser';
+import { compressImageFile, compressDataUri } from '../utils/imageCompressor';
 
 interface OrderFormScreenProps {
   shop: Shop;
@@ -529,26 +530,43 @@ export const OrderFormScreen: React.FC<OrderFormScreenProps> = ({
     setIsCameraOpen(true);
   };
 
-  const handleCameraCapture = (dataUri: string) => {
-    if (activePhotoSlot === 1) setClothPhoto(dataUri);
-    if (activePhotoSlot === 2) setDressDesignPhoto(dataUri);
-    if (activePhotoSlot === 3) setCustomerDesignPhoto(dataUri);
-    if (activePhotoSlot === 4) setExtraPhoto(dataUri);
+  const handleCameraCapture = async (dataUri: string) => {
+    try {
+      const optimizedUri = await compressDataUri(dataUri, { maxWidth: 1080, maxHeight: 1080, quality: 0.72 });
+      if (activePhotoSlot === 1) setClothPhoto(optimizedUri);
+      if (activePhotoSlot === 2) setDressDesignPhoto(optimizedUri);
+      if (activePhotoSlot === 3) setCustomerDesignPhoto(optimizedUri);
+      if (activePhotoSlot === 4) setExtraPhoto(optimizedUri);
+    } catch {
+      if (activePhotoSlot === 1) setClothPhoto(dataUri);
+      if (activePhotoSlot === 2) setDressDesignPhoto(dataUri);
+      if (activePhotoSlot === 3) setCustomerDesignPhoto(dataUri);
+      if (activePhotoSlot === 4) setExtraPhoto(dataUri);
+    }
     setIsCameraOpen(false);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2 | 3 | 4) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2 | 3 | 4) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUri = reader.result as string;
-      if (slot === 1) setClothPhoto(dataUri);
-      if (slot === 2) setDressDesignPhoto(dataUri);
-      if (slot === 3) setCustomerDesignPhoto(dataUri);
-      if (slot === 4) setExtraPhoto(dataUri);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressedUri = await compressImageFile(file, { maxWidth: 1080, maxHeight: 1080, quality: 0.72 });
+      if (slot === 1) setClothPhoto(compressedUri);
+      if (slot === 2) setDressDesignPhoto(compressedUri);
+      if (slot === 3) setCustomerDesignPhoto(compressedUri);
+      if (slot === 4) setExtraPhoto(compressedUri);
+    } catch (err) {
+      console.warn('Failed to compress gallery image:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUri = reader.result as string;
+        if (slot === 1) setClothPhoto(dataUri);
+        if (slot === 2) setDressDesignPhoto(dataUri);
+        if (slot === 3) setCustomerDesignPhoto(dataUri);
+        if (slot === 4) setExtraPhoto(dataUri);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleApplyAiEstimate = () => {

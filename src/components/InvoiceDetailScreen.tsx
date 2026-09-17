@@ -6,6 +6,7 @@ import { generateInvoiceImageUriAsync, downloadImageFromUri } from '../utils/inv
 import { generateInvoiceQrDataUrl } from '../utils/qrcode';
 import { InvoiceImageModal } from './InvoiceImageModal';
 import { CameraCaptureModal } from './CameraCaptureModal';
+import { compressImageFile, compressDataUri } from '../utils/imageCompressor';
 import { Logo } from './Logo';
 import {
   ArrowLeft,
@@ -123,38 +124,65 @@ export const InvoiceDetailScreen: React.FC<InvoiceDetailScreenProps> = ({
     }
   };
 
-  const handlePhotoCaptured = (uri: string) => {
+  const handlePhotoCaptured = async (uri: string) => {
     if (!invoice) return;
-    const updated = { ...invoice };
-    if (activePhotoSlot === 1) updated.clothPhotoUri = uri;
-    if (activePhotoSlot === 2) updated.dressDesignPhotoUri = uri;
-    if (activePhotoSlot === 3) updated.customerDesignPhotoUri = uri;
-    if (activePhotoSlot === 4) updated.extraPhotoUri = uri;
-    updated.updatedAt = Date.now();
-    if (onUpdateInvoice) {
-      onUpdateInvoice(updated);
+    try {
+      const optimizedUri = await compressDataUri(uri, { maxWidth: 1080, maxHeight: 1080, quality: 0.72 });
+      const updated = { ...invoice };
+      if (activePhotoSlot === 1) updated.clothPhotoUri = optimizedUri;
+      if (activePhotoSlot === 2) updated.dressDesignPhotoUri = optimizedUri;
+      if (activePhotoSlot === 3) updated.customerDesignPhotoUri = optimizedUri;
+      if (activePhotoSlot === 4) updated.extraPhotoUri = optimizedUri;
+      updated.updatedAt = Date.now();
+      if (onUpdateInvoice) {
+        onUpdateInvoice(updated);
+      }
+    } catch {
+      const updated = { ...invoice };
+      if (activePhotoSlot === 1) updated.clothPhotoUri = uri;
+      if (activePhotoSlot === 2) updated.dressDesignPhotoUri = uri;
+      if (activePhotoSlot === 3) updated.customerDesignPhotoUri = uri;
+      if (activePhotoSlot === 4) updated.extraPhotoUri = uri;
+      updated.updatedAt = Date.now();
+      if (onUpdateInvoice) {
+        onUpdateInvoice(updated);
+      }
     }
   };
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2 | 3 | 4) => {
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2 | 3 | 4) => {
     const file = e.target.files?.[0];
     if (file && invoice) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const uri = event.target?.result as string;
-        if (uri) {
-          const updated = { ...invoice };
-          if (slot === 1) updated.clothPhotoUri = uri;
-          if (slot === 2) updated.dressDesignPhotoUri = uri;
-          if (slot === 3) updated.customerDesignPhotoUri = uri;
-          if (slot === 4) updated.extraPhotoUri = uri;
-          updated.updatedAt = Date.now();
-          if (onUpdateInvoice) {
-            onUpdateInvoice(updated);
-          }
+      try {
+        const compressedUri = await compressImageFile(file, { maxWidth: 1080, maxHeight: 1080, quality: 0.72 });
+        const updated = { ...invoice };
+        if (slot === 1) updated.clothPhotoUri = compressedUri;
+        if (slot === 2) updated.dressDesignPhotoUri = compressedUri;
+        if (slot === 3) updated.customerDesignPhotoUri = compressedUri;
+        if (slot === 4) updated.extraPhotoUri = compressedUri;
+        updated.updatedAt = Date.now();
+        if (onUpdateInvoice) {
+          onUpdateInvoice(updated);
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.warn('Compression failed for invoice detail photo, falling back to raw reader:', err);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const uri = event.target?.result as string;
+          if (uri) {
+            const updated = { ...invoice };
+            if (slot === 1) updated.clothPhotoUri = uri;
+            if (slot === 2) updated.dressDesignPhotoUri = uri;
+            if (slot === 3) updated.customerDesignPhotoUri = uri;
+            if (slot === 4) updated.extraPhotoUri = uri;
+            updated.updatedAt = Date.now();
+            if (onUpdateInvoice) {
+              onUpdateInvoice(updated);
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 

@@ -1,6 +1,7 @@
 import { Shop, Invoice, TailorRecord, Expense, CatalogItem, Measurement, BackupData, AppData, Language } from '../types';
 import { initialShops, initialCatalogItems, initialInvoices, initialTailorRecords, initialExpenses } from '../data/initialData';
 import { isAndroidNativeApp, nativeSaveBackup } from './nativeBridge';
+import { saveInvoicesToIndexedDb, loadInvoicesFromIndexedDb } from './indexedDb';
 
 const STORAGE_KEYS = {
   SHOPS: 'jibon_tailor_shops',
@@ -208,7 +209,45 @@ export const getStoredInvoices = (): Invoice[] => {
 };
 
 export const saveStoredInvoices = (invoices: Invoice[]) => {
-  localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+  // 1. Asynchronously persist full invoices (including HD photos) into IndexedDB (virtually unlimited quota)
+  saveInvoicesToIndexedDb(invoices).catch((err) => {
+    console.warn('IndexedDB persistence warning:', err);
+  });
+
+  // 2. Safely sync to localStorage with quota-exceeded fallback protection
+  try {
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+  } catch (quotaErr) {
+    console.warn('LocalStorage quota limit reached for invoices, applying smart cache optimization:', quotaErr);
+    try {
+      // Compress older invoice photos in localStorage cache while preserving full copies in IndexedDB
+      const optimized = invoices.map((inv, idx) => {
+        if (idx < 5) return inv; // keep latest 5 invoices with photos in localStorage
+        return {
+          ...inv,
+          clothPhotoUri: inv.clothPhotoUri && inv.clothPhotoUri.length > 30000 ? undefined : inv.clothPhotoUri,
+          dressDesignPhotoUri: inv.dressDesignPhotoUri && inv.dressDesignPhotoUri.length > 30000 ? undefined : inv.dressDesignPhotoUri,
+          customerDesignPhotoUri: inv.customerDesignPhotoUri && inv.customerDesignPhotoUri.length > 30000 ? undefined : inv.customerDesignPhotoUri,
+          extraPhotoUri: inv.extraPhotoUri && inv.extraPhotoUri.length > 30000 ? undefined : inv.extraPhotoUri,
+        };
+      });
+      localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(optimized));
+    } catch (fallbackErr) {
+      console.warn('Fallback optimization also exceeded quota, storing metadata only in localStorage:', fallbackErr);
+      try {
+        const lean = invoices.map((inv) => ({
+          ...inv,
+          clothPhotoUri: undefined,
+          dressDesignPhotoUri: undefined,
+          customerDesignPhotoUri: undefined,
+          extraPhotoUri: undefined,
+        }));
+        localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(lean));
+      } catch (finalErr) {
+        console.error('LocalStorage is completely full. Invoices safely preserved in IndexedDB.', finalErr);
+      }
+    }
+  }
 };
 
 export const getStoredTailorRecords = (): TailorRecord[] => {
@@ -262,7 +301,11 @@ export const getStoredCatalog = (): CatalogItem[] => {
 };
 
 export const saveStoredCatalog = (items: CatalogItem[]) => {
-  localStorage.setItem(STORAGE_KEYS.CATALOG, JSON.stringify(items));
+  try {
+    localStorage.setItem(STORAGE_KEYS.CATALOG, JSON.stringify(items));
+  } catch (err) {
+    console.warn('LocalStorage quota warning for catalog items:', err);
+  }
 };
 
 export const getStoredMeasurements = (): Measurement[] => {

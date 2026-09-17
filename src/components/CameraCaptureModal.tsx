@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, RefreshCw, Check, X, AlertCircle, Upload, Smartphone } from 'lucide-react';
+import { Camera, RefreshCw, Check, X, AlertCircle, Upload, Smartphone, Loader2 } from 'lucide-react';
+import { compressDataUri, compressImageFile } from '../utils/imageCompressor';
 
 interface CameraCaptureModalProps {
   title: string;
@@ -24,6 +25,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isStartingCamera, setIsStartingCamera] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -81,7 +83,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
-  const takeSnapshot = () => {
+  const takeSnapshot = async () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -93,8 +95,16 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(video, 0, 0, w, h);
-      const dataUri = canvas.toDataURL('image/jpeg', 0.9);
-      setCapturedUri(dataUri);
+      const rawUri = canvas.toDataURL('image/jpeg', 0.85);
+      setIsCompressing(true);
+      try {
+        const compressed = await compressDataUri(rawUri, { maxWidth: 1080, maxHeight: 1080, quality: 0.72 });
+        setCapturedUri(compressed);
+      } catch (err) {
+        setCapturedUri(rawUri);
+      } finally {
+        setIsCompressing(false);
+      }
       stopCamera();
     }
   };
@@ -111,18 +121,19 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const uri = event.target?.result as string;
-        if (uri) {
-          onCapture(uri);
-          onClose();
-        }
-      };
-      reader.readAsDataURL(file);
+      setIsCompressing(true);
+      try {
+        const compressed = await compressImageFile(file, { maxWidth: 1080, maxHeight: 1080, quality: 0.72 });
+        onCapture(compressed);
+        onClose();
+      } catch (err) {
+        console.warn('Compression error on file upload:', err);
+      } finally {
+        setIsCompressing(false);
+      }
     }
   };
 
@@ -147,6 +158,14 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
         {/* Viewport Area */}
         <div className="relative flex min-h-[300px] flex-col items-center justify-center bg-black">
+          {isCompressing && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-xs text-white">
+              <Loader2 className="h-8 w-8 animate-spin text-emerald-400 mb-2" />
+              <p className="text-sm font-bold text-white">ছবি প্রস্তুত ও অপটিমাইজ করা হচ্ছে...</p>
+              <p className="text-xs text-slate-300 mt-1">দয়া করে এক মুহূর্ত অপেক্ষা করুন</p>
+            </div>
+          )}
+
           {capturedUri ? (
             <div className="relative w-full flex items-center justify-center p-2">
               <img
