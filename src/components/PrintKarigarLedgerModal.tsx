@@ -170,6 +170,7 @@ export const PrintKarigarLedgerModal: React.FC<PrintKarigarLedgerModalProps> = (
   }, [groupedKarigars]);
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -178,12 +179,19 @@ export const PrintKarigarLedgerModal: React.FC<PrintKarigarLedgerModalProps> = (
       ? `Karigar_${currentKarigar.tailorName.replace(/\s+/g, '_')}_Statement.pdf`
       : `Karigars_Master_Payroll_Sheet_${shop.name.replace(/\s+/g, '_')}.pdf`;
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     const title =
       mode === 'individual' && currentKarigar
         ? `${currentKarigar.tailorName} - Karigar Statement`
         : `${shop.name} - Karigars Payroll Master Sheet`;
-    printHtmlElement('printable-karigar-area', title);
+    try {
+      setIsPrinting(true);
+      await printHtmlElement('printable-karigar-area', title);
+    } catch (err) {
+      console.error('Print failed:', err);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleDownloadPdf = async () => {
@@ -283,11 +291,16 @@ export const PrintKarigarLedgerModal: React.FC<PrintKarigarLedgerModalProps> = (
             {/* Direct Print Button - Royal Indigo */}
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition active:scale-95"
+              disabled={isPrinting}
+              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition active:scale-95 disabled:opacity-60 cursor-pointer"
               title={isEn ? 'Print or Save via Browser Dialog' : 'সরাসরি প্রিন্ট বা ডায়ালগ বক্স'}
             >
-              <Printer className="h-3.5 w-3.5" />
-              <span>{isEn ? 'Print' : 'প্রিন্ট'}</span>
+              {isPrinting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Printer className="h-3.5 w-3.5" />
+              )}
+              <span>{isPrinting ? (isEn ? 'Printing...' : 'প্রিন্ট হচ্ছে...') : (isEn ? 'Print' : 'প্রিন্ট')}</span>
             </button>
 
             {/* Download HD Image - Sky/Slate */}

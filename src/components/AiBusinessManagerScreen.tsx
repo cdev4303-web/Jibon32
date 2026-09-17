@@ -358,14 +358,22 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
   };
 
   const [isDownloadingReportPdf, setIsDownloadingReportPdf] = useState(false);
+  const [isPrintingReport, setIsPrintingReport] = useState(false);
 
   const reportPdfFilename = `AI_Business_Report_${shop.name.replace(/\s+/g, '_')}_${reportPeriod}.pdf`;
 
-  const handlePrintReport = () => {
-    printHtmlElement(
-      'printable-report-area',
-      `${shop.name} - AI Business Report (${reportPeriod})`
-    );
+  const handlePrintReport = async () => {
+    try {
+      setIsPrintingReport(true);
+      await printHtmlElement(
+        'printable-report-area',
+        `${shop.name} - AI Business Report (${reportPeriod})`
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsPrintingReport(false);
+    }
   };
 
   const handleDownloadReportPdf = async () => {
@@ -1375,11 +1383,16 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
                 {/* Print Button */}
                 <button
                   onClick={handlePrintReport}
-                  className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold flex items-center gap-1 transition shadow-2xs"
+                  disabled={isPrintingReport}
+                  className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold flex items-center gap-1 transition shadow-2xs disabled:opacity-60 cursor-pointer"
                   title={isEn ? 'Print Report via Browser Dialog' : 'সরাসরি প্রিন্ট বা ডায়ালগ'}
                 >
-                  <Printer className="h-3.5 w-3.5 text-slate-600" />
-                  <span>{isEn ? 'Print' : 'প্রিন্ট'}</span>
+                  {isPrintingReport ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-600" />
+                  ) : (
+                    <Printer className="h-3.5 w-3.5 text-slate-600" />
+                  )}
+                  <span>{isPrintingReport ? (isEn ? 'Printing...' : 'প্রিন্ট হচ্ছে...') : (isEn ? 'Print' : 'প্রিন্ট')}</span>
                 </button>
               </div>
             </div>

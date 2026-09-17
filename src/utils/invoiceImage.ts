@@ -297,26 +297,40 @@ export async function generateInvoiceImageUriAsync(
 
   // 5. Items Table Header
   const tableY = 405;
+  const tableW = width - 80; // 820px wide (from x = 40 to x = 860)
   ctx.fillStyle = '#064E3B';
   ctx.beginPath();
-  ctx.roundRect(40, tableY, width - 80, 40, [8, 8, 0, 0]);
+  ctx.roundRect(40, tableY, tableW, 40, [8, 8, 0, 0]);
   ctx.fill();
 
+  // Column X coordinates carefully calculated to prevent any text overlap:
+  // Col 1 (#): Center at 65 (span 40 to 90)
+  // Col 2 (Description): Left at 100 (span 90 to 505)
+  // Col 3 (QTY): Center at 535 (span 510 to 565)
+  // Col 4 (RATE): Right-aligned at 705 (span 575 to 705, width 130px)
+  // Col 5 (TOTAL): Right-aligned at 845 (span 715 to 845, width 130px)
+  const col1X = 65;
+  const col2X = 100;
+  const col3X = 535;
+  const col4X = 705;
+  const col5X = 845;
+
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
   ctx.textAlign = 'center';
-  ctx.fillText('#', 65, tableY + 25);
+  ctx.fillText('#', col1X, tableY + 25);
 
   ctx.textAlign = 'left';
-  ctx.fillText('ITEM / WORK DESCRIPTION', 110, tableY + 25);
+  ctx.fillText(isEn ? 'ITEM / WORK DESCRIPTION' : 'আইটেম / কাজের বিবরণ (DESCRIPTION)', col2X, tableY + 25);
 
   ctx.textAlign = 'center';
-  ctx.fillText('QTY', width - 280, tableY + 25);
+  ctx.fillText(isEn ? 'QTY' : 'পরিমাণ (QTY)', col3X, tableY + 25);
 
   ctx.textAlign = 'right';
-  ctx.fillText(`RATE (${shop.currency})`, width - 180, tableY + 25);
+  ctx.fillText(`RATE (${shop.currency})`, col4X, tableY + 25);
 
-  ctx.fillText(`TOTAL (${shop.currency})`, width - 65, tableY + 25);
+  ctx.fillText(`TOTAL (${shop.currency})`, col5X, tableY + 25);
 
   // Table Body Rows
   let currY = tableY + 40;
@@ -337,7 +351,7 @@ export async function generateInvoiceImageUriAsync(
   items.forEach((item, index) => {
     const rowH = 42;
     ctx.fillStyle = index % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
-    ctx.fillRect(40, currY, width - 80, rowH);
+    ctx.fillRect(40, currY, tableW, rowH);
 
     ctx.strokeStyle = '#E2E8F0';
     ctx.lineWidth = 1;
@@ -349,27 +363,27 @@ export async function generateInvoiceImageUriAsync(
     ctx.fillStyle = '#64748B';
     ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText((index + 1).toString(), 65, currY + 26);
+    ctx.fillText((index + 1).toString(), col1X, currY + 26);
 
     ctx.textAlign = 'left';
     ctx.fillStyle = '#1E293B';
     ctx.font = '500 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     const desc = item.description || `Tailoring Item #${index + 1}`;
-    ctx.fillText(desc.length > 45 ? desc.slice(0, 42) + '...' : desc, 110, currY + 26);
+    ctx.fillText(desc.length > 42 ? desc.slice(0, 39) + '...' : desc, col2X, currY + 26);
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#0F172A';
     ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText((item.quantity || 1).toString(), width - 280, currY + 26);
+    ctx.fillText((item.quantity || 1).toString(), col3X, currY + 26);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#475569';
     ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText(item.unitPrice.toFixed(2), width - 180, currY + 26);
+    ctx.fillText(item.unitPrice.toFixed(2), col4X, currY + 26);
 
     ctx.fillStyle = '#064E3B';
     ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText(item.totalPrice.toFixed(2), width - 65, currY + 26);
+    ctx.fillText(item.totalPrice.toFixed(2), col5X, currY + 26);
 
     currY += rowH;
   });
@@ -382,7 +396,7 @@ export async function generateInvoiceImageUriAsync(
   ctx.strokeStyle = '#BFDBFE';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect(40, midY, 410, 240, 10);
+  ctx.roundRect(40, midY, 410, 245, 10);
   ctx.fill();
   ctx.stroke();
 
@@ -437,32 +451,33 @@ export async function generateInvoiceImageUriAsync(
   // Financials Box (Right side)
   const finX = 475;
   const finW = width - 475 - 40;
+  const finBoxH = 245;
 
   ctx.fillStyle = '#FFFFFF';
   ctx.strokeStyle = '#E2E8F0';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.roundRect(finX, midY, finW, 240, 10);
+  ctx.roundRect(finX, midY, finW, finBoxH, 10);
   ctx.fill();
   ctx.stroke();
 
-  let finRowY = midY + 35;
-  const drawFinRow = (label: string, value: string, isBold: boolean = false, color: string = '#1E293B') => {
+  let finRowY = midY + 34;
+  const drawFinRow = (label: string, value: string, isBold: boolean = false, color: string = '#1E293B', fontSize: number = 14) => {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#475569';
     ctx.font = isBold
-      ? 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-      : '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ? `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
+      : `${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
     ctx.fillText(label, finX + 20, finRowY);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = color;
     ctx.font = isBold
-      ? 'bold 17px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-      : '500 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ? `bold ${fontSize + 2}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
+      : `500 ${fontSize + 1}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
     ctx.fillText(value, finX + finW - 20, finRowY);
 
-    finRowY += 34;
+    finRowY += 32;
   };
 
   drawFinRow(isEn ? 'Subtotal:' : 'সাবটোটাল (Subtotal):', `${shop.currency} ${invoice.subtotal.toFixed(2)}`);
@@ -471,15 +486,16 @@ export async function generateInvoiceImageUriAsync(
     drawFinRow(isEn ? 'Discount:' : 'ডিসকাউন্ট (Discount):', `-${shop.currency} ${invoice.discount.toFixed(2)}`, false, '#059669');
   }
 
-  // Divider
-  ctx.strokeStyle = '#CBD5E1';
+  // Clean Divider between Subtotal/Discount and Net Total (never cuts through text)
+  ctx.strokeStyle = '#E2E8F0';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(finX + 15, finRowY - 10);
-  ctx.lineTo(finX + finW - 15, finRowY - 10);
+  ctx.moveTo(finX + 15, finRowY - 6);
+  ctx.lineTo(finX + finW - 15, finRowY - 6);
   ctx.stroke();
 
-  drawFinRow(isEn ? 'Net Total:' : 'মোট প্রদেয় (Net Total):', `${shop.currency} ${invoice.netTotal.toFixed(2)}`, true, '#064E3B');
+  finRowY += 8;
+  drawFinRow(isEn ? 'Net Total:' : 'মোট প্রদেয় (Net Total):', `${shop.currency} ${invoice.netTotal.toFixed(2)}`, true, '#064E3B', 15);
   drawFinRow(
     isEn ? `Advance Paid (${invoice.paymentMethod}):` : `অগ্রিম জমা (${invoice.paymentMethod}):`,
     `${shop.currency} ${invoice.advanceDeposit.toFixed(2)}`,
@@ -487,13 +503,16 @@ export async function generateInvoiceImageUriAsync(
     '#047857'
   );
 
-  // Due Highlight Bar
+  // Due Highlight Bar - perfectly positioned with zero overlap
+  finRowY += 4;
+  const dueBoxH = 48;
   ctx.fillStyle = invoice.remainingDue > 0 ? '#FFF1F2' : '#F0FDF4';
   ctx.beginPath();
-  ctx.roundRect(finX + 10, finRowY - 15, finW - 20, 48, 8);
+  ctx.roundRect(finX + 10, finRowY, finW - 20, dueBoxH, 8);
   ctx.fill();
 
   ctx.strokeStyle = invoice.remainingDue > 0 ? '#FECDD3' : '#BBF7D0';
+  ctx.lineWidth = 1;
   ctx.stroke();
 
   ctx.textAlign = 'left';
@@ -508,7 +527,7 @@ export async function generateInvoiceImageUriAsync(
       ? 'Payment Status:'
       : 'পরিশোধ অবস্থা:',
     finX + 25,
-    finRowY + 16
+    finRowY + 30
   );
 
   ctx.textAlign = 'right';
@@ -518,7 +537,7 @@ export async function generateInvoiceImageUriAsync(
       ? `${shop.currency} ${invoice.remainingDue.toFixed(2)}`
       : 'FULL PAID',
     finX + finW - 25,
-    finRowY + 16
+    finRowY + 31
   );
 
   let nextSectionY = midY + 265;

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Invoice, Shop, Language } from '../types';
-import { Printer, X, Image as ImageIcon, Send, MessageSquareText, QrCode, FileDown, Download, Loader2, Share2 } from 'lucide-react';
+import { Printer, X, Image as ImageIcon, Send, MessageSquareText, QrCode, FileDown, Download, Loader2, Share2, CheckCircle, ExternalLink } from 'lucide-react';
 import { InvoiceImageModal } from './InvoiceImageModal';
 import { Logo } from './Logo';
 import { openWhatsAppUrl, createInvoiceWhatsAppMessage, createReadyWhatsAppMessage, shareInvoicePngOnly } from '../utils/whatsapp';
 import { generateInvoiceQrDataUrl } from '../utils/qrcode';
-import { printHtmlElement, exportElementToPdf } from '../utils/print';
+import { printHtmlElement, exportElementToPdf, isIframeEnvironment } from '../utils/print';
 import { captureElementToPng } from '../utils/domCapture';
 import { downloadImageFromUri, generateInvoiceImageUriAsync } from '../utils/invoiceImage';
 
@@ -27,6 +27,8 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isReadyMode, setIsReadyMode] = useState(false);
   const [qrUri, setQrUri] = useState<string>('');
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printNotice, setPrintNotice] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingPng, setIsGeneratingPng] = useState(false);
   const [isSharingPng, setIsSharingPng] = useState(false);
@@ -44,8 +46,24 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
   const pdfFilename = `Invoice_${invoice.id}_${invoice.customerName.replace(/\s+/g, '_')}.pdf`;
   const pngFilename = `Invoice_${invoice.id}_${invoice.customerName.replace(/\s+/g, '_')}.png`;
 
-  const handlePrint = () => {
-    printHtmlElement('printable-area', `Invoice #${invoice.id} - ${shop.name}`);
+  const handlePrint = async () => {
+    try {
+      setIsPrinting(true);
+      setPrintNotice(null);
+      const success = await printHtmlElement('printable-area', `Invoice #${invoice.id} - ${shop.name}`);
+      if (success) {
+        setPrintNotice(
+          lang === 'EN'
+            ? 'Printer dialog opened! Select your printer to print.'
+            : 'প্রিন্টারের ডায়ালগ বক্স ওপেন হয়েছে! আপনার প্রিন্টার সিলেক্ট করে প্রিন্ট করুন।'
+        );
+        setTimeout(() => setPrintNotice(null), 5000);
+      }
+    } catch (err) {
+      console.error('Print execution failed:', err);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleDownloadPdf = async () => {
@@ -147,11 +165,20 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
               {/* Print Button - Royal Indigo (Always visible, first button!) */}
               <button
                 onClick={handlePrint}
-                className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition active:scale-95"
-                title={lang === 'EN' ? 'Print or Save via Browser Dialog' : 'সরাসরি প্রিন্ট বা ডায়ালগ বক্স'}
+                disabled={isPrinting}
+                className="flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-md transition active:scale-95 disabled:opacity-60 cursor-pointer"
+                title={lang === 'EN' ? 'Print Slip or Save as PDF' : 'সরাসরি প্রিন্ট বা PDF ডাউনলোড'}
               >
-                <Printer className="h-3.5 w-3.5" />
-                <span>{lang === 'EN' ? 'Print' : 'প্রিন্ট'}</span>
+                {isPrinting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Printer className="h-3.5 w-3.5" />
+                )}
+                <span>
+                  {isPrinting
+                    ? (lang === 'EN' ? 'Printing...' : 'প্রিন্ট হচ্ছে...')
+                    : (lang === 'EN' ? 'Print' : 'প্রিন্ট')}
+                </span>
               </button>
 
               {/* Direct HD PNG Image Download Button - Sky Blue */}
@@ -212,8 +239,38 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                   <span>{lang === 'EN' ? 'Ready Alert' : 'কাপড় রেডি মেসেজ'}</span>
                 </button>
               )}
+
+              {/* New Tab Direct Print Button (when running in iframe preview) */}
+              {isIframeEnvironment() && (
+                <a
+                  href={window.location.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 rounded-xl bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 text-[11px] font-semibold text-amber-300 border border-slate-700 shadow-sm transition"
+                  title={lang === 'EN' ? 'Open in a new tab for native system printer dialog' : 'নতুন ট্যাবে খুলুন (সরাসরি সিস্টেম প্রিন্টার ডায়ালগ পাবেন)'}
+                >
+                  <ExternalLink className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                  <span className="hidden sm:inline">{lang === 'EN' ? 'Open in New Tab' : 'নতুন ট্যাবে খুলুন'}</span>
+                </a>
+              )}
             </div>
           </div>
+
+          {/* Feedback Status Notice (when PDF or print is triggered) */}
+          {printNotice && (
+            <div className="bg-emerald-950 border-b border-emerald-800 px-4 py-2.5 text-xs font-medium text-emerald-200 flex items-center justify-between gap-3 print:hidden animate-fade-in shadow-inner">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span>{printNotice}</span>
+              </div>
+              <button
+                onClick={() => setPrintNotice(null)}
+                className="text-emerald-400 hover:text-white text-xs font-bold shrink-0 px-1 py-0.5 rounded cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Printable Sheet */}
           <div className="overflow-y-auto p-6 sm:p-8 text-slate-800 print:overflow-visible print:p-0 print-invoice" id="printable-area">
@@ -308,11 +365,11 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             <table className="mt-4 w-full border-collapse text-xs">
               <thead>
                 <tr className="bg-emerald-800 text-white">
-                  <th className="py-2 px-3 text-center w-10">#</th>
+                  <th className="py-2 px-3 text-center w-10 shrink-0">#</th>
                   <th className="py-2 px-3 text-left">Item Description</th>
-                  <th className="py-2 px-3 text-center w-14">Qty</th>
-                  <th className="py-2 px-3 text-right w-24">Rate ({shop.currency})</th>
-                  <th className="py-2 px-3 text-right w-28">Total ({shop.currency})</th>
+                  <th className="py-2 px-3 text-center w-16 whitespace-nowrap shrink-0">Qty</th>
+                  <th className="py-2 px-3 text-right w-32 whitespace-nowrap shrink-0">Rate ({shop.currency})</th>
+                  <th className="py-2 px-3 text-right w-32 whitespace-nowrap shrink-0">Total ({shop.currency})</th>
                 </tr>
               </thead>
               <tbody>
@@ -321,18 +378,18 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                     <tr key={index} className="border-b border-slate-200 print-avoid-break">
                       <td className="py-2 px-3 text-center text-slate-500">{index + 1}</td>
                       <td className="py-2 px-3 font-medium text-slate-800">{item.description}</td>
-                      <td className="py-2 px-3 text-center font-bold">{item.quantity}</td>
-                      <td className="py-2 px-3 text-right">{item.unitPrice.toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-bold text-slate-900">{item.totalPrice.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-center font-bold whitespace-nowrap">{item.quantity}</td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{item.unitPrice.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right font-bold text-slate-900 whitespace-nowrap">{item.totalPrice.toFixed(2)}</td>
                     </tr>
                   ))
                 ) : (
                   <tr className="border-b border-slate-200 print-avoid-break">
                     <td className="py-2 px-3 text-center">1</td>
                     <td className="py-2 px-3 font-medium">Custom Tailoring Work ({invoice.dressType})</td>
-                    <td className="py-2 px-3 text-center font-bold">1</td>
-                    <td className="py-2 px-3 text-right">{invoice.subtotal.toFixed(2)}</td>
-                    <td className="py-2 px-3 text-right font-bold">{invoice.subtotal.toFixed(2)}</td>
+                    <td className="py-2 px-3 text-center font-bold whitespace-nowrap">1</td>
+                    <td className="py-2 px-3 text-right whitespace-nowrap font-medium">{invoice.subtotal.toFixed(2)}</td>
+                    <td className="py-2 px-3 text-right font-bold whitespace-nowrap">{invoice.subtotal.toFixed(2)}</td>
                   </tr>
                 )}
               </tbody>
@@ -480,11 +537,20 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 onClick={handlePrint}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 py-2.5 px-3 text-xs font-bold text-white shadow-md transition active:scale-95 border border-indigo-400"
-                title={lang === 'EN' ? 'Print or Save via Browser Dialog' : 'সরাসরি প্রিন্ট করুন'}
+                disabled={isPrinting}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 py-2.5 px-3 text-xs font-bold text-white shadow-md transition active:scale-95 border border-indigo-400 disabled:opacity-60 cursor-pointer"
+                title={lang === 'EN' ? 'Print Slip or Save as PDF' : 'সরাসরি প্রিন্ট বা PDF ডাউনলোড'}
               >
-                <Printer className="h-4 w-4 shrink-0" />
-                <span>{lang === 'EN' ? 'Print Slip' : 'রসিদ প্রিন্ট করুন'}</span>
+                {isPrinting ? (
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                ) : (
+                  <Printer className="h-4 w-4 shrink-0" />
+                )}
+                <span>
+                  {isPrinting
+                    ? (lang === 'EN' ? 'Printing...' : 'প্রিন্ট হচ্ছে...')
+                    : (lang === 'EN' ? 'Print Slip' : 'রসিদ প্রিন্ট করুন')}
+                </span>
               </button>
 
               {invoice.orderStatus === 'Ready for Pickup' ? (

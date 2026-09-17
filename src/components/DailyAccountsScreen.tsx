@@ -110,14 +110,22 @@ export const DailyAccountsScreen: React.FC<DailyAccountsScreenProps> = ({
   const netCashClosing = totalCashIn - totalCashOut;
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const pdfFilename = `Daily_Accounts_${shop.name.replace(/\s+/g, '_')}_${selectedDate}.pdf`;
 
-  const handlePrintDaily = () => {
-    printHtmlElement(
-      'printable-daily-accounts-area',
-      `${shop.name} - Daily Accounts (${selectedDate})`
-    );
+  const handlePrintDaily = async () => {
+    try {
+      setIsPrinting(true);
+      await printHtmlElement(
+        'printable-daily-accounts-area',
+        `${shop.name} - Daily Accounts (${selectedDate})`
+      );
+    } catch (err) {
+      console.error('Print failed:', err);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleDownloadPdfDaily = async () => {
@@ -225,11 +233,16 @@ export const DailyAccountsScreen: React.FC<DailyAccountsScreenProps> = ({
 
             <button
               onClick={handlePrintDaily}
-              className="flex items-center gap-1.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-black px-3.5 py-2 text-xs shadow-md transition active:scale-95"
+              disabled={isPrinting}
+              className="flex items-center gap-1.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-black px-3.5 py-2 text-xs shadow-md transition active:scale-95 disabled:opacity-60 cursor-pointer"
               title={isEn ? 'Print Daily Accounts Sheet' : 'দৈনিক হিসাব শিট প্রিন্ট'}
             >
-              <Printer className="h-4 w-4 text-amber-300" />
-              <span>{isEn ? 'Print' : 'প্রিন্ট'}</span>
+              {isPrinting ? (
+                <Loader2 className="h-4 w-4 animate-spin text-amber-300" />
+              ) : (
+                <Printer className="h-4 w-4 text-amber-300" />
+              )}
+              <span>{isPrinting ? (isEn ? 'Printing...' : 'প্রিন্ট হচ্ছে...') : (isEn ? 'Print' : 'প্রিন্ট')}</span>
             </button>
           </div>
         </div>
