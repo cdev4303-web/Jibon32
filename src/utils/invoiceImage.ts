@@ -179,14 +179,14 @@ export async function generateInvoiceImageUriAsync(
   ctx.textAlign = 'center';
   ctx.fillText(shop.name.toUpperCase(), (width + 50) / 2, 52);
 
-  // Shop Info & CR
+  // Shop Info
   ctx.fillStyle = '#A7F3D0';
   ctx.font = '16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`${shop.address}  |  📞 ${shop.phone}`, (width + 50) / 2, 88);
+  ctx.fillText(`${shop.address}`, (width + 50) / 2, 84);
 
-  ctx.fillStyle = '#FDE68A'; // Amber 200
+  ctx.fillStyle = '#FDE68A';
   ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`C.R. No: ${shop.crNumber}  •  OFFICIAL INVOICE RECEIPT`, (width + 50) / 2, 120);
+  ctx.fillText(`📞 Tel: ${shop.phone}   •   CR: ${shop.crNumber}`, (width + 50) / 2, 114);
 
   // 3. Invoice Header Card
   const metaY = 175;

@@ -110,15 +110,10 @@ export async function captureElementToPng(
       h1.style.color = '#ffffff';
       (h1.style as any).webkitTextFillColor = '#ffffff';
     }
-    h.querySelectorAll('p').forEach((p) => {
-      const pel = p as HTMLElement;
-      if (pel.textContent && pel.textContent.includes('Commercial Registration')) {
-        pel.style.color = '#fde68a';
-        (pel.style as any).webkitTextFillColor = '#fde68a';
-      } else {
-        pel.style.color = '#d1fae5';
-        (pel.style as any).webkitTextFillColor = '#d1fae5';
-      }
+    h.querySelectorAll('div, p, span').forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      (htmlEl.style as any).webkitPrintColorAdjust = 'exact';
+      (htmlEl.style as any).printColorAdjust = 'exact';
     });
   });
 

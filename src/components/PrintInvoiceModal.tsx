@@ -289,9 +289,9 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                 printColorAdjust: 'exact',
               }}
             >
-              <div className="flex items-center gap-3.5">
-                <Logo size="lg" />
-                <div className="text-left text-white">
+              <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                <Logo size="lg" className="shrink-0" />
+                <div className="text-left text-white flex-1 min-w-0">
                   <h1
                     className="text-2xl sm:text-3xl font-black tracking-wide text-white leading-tight uppercase drop-shadow-xs"
                     style={{
@@ -304,8 +304,8 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                   >
                     {shop.name}
                   </h1>
-                  <p
-                    className="text-xs text-emerald-100 mt-1 leading-normal font-medium"
+                  <div
+                    className="text-xs text-emerald-100 font-medium mt-1"
                     style={{
                       color: '#d1fae5',
                       WebkitTextFillColor: '#d1fae5',
@@ -313,19 +313,32 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                       printColorAdjust: 'exact',
                     }}
                   >
-                    {shop.address} | Tel: {shop.phone}
-                  </p>
-                  <p
-                    className="text-[11px] font-bold text-amber-200 mt-1 leading-normal tracking-wide"
-                    style={{
-                      color: '#fde68a',
-                      WebkitTextFillColor: '#fde68a',
-                      WebkitPrintColorAdjust: 'exact',
-                      printColorAdjust: 'exact',
-                    }}
-                  >
-                    Commercial Registration (CR): {shop.crNumber}
-                  </p>
+                    <div className="leading-snug text-emerald-100">{shop.address}</div>
+                    <div
+                      className="flex items-center gap-2 sm:gap-3 mt-1 font-semibold text-xs whitespace-nowrap"
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      <span
+                        className="whitespace-nowrap inline-flex items-center"
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        Tel:&nbsp;<strong className="text-white font-bold">{shop.phone}</strong>
+                      </span>
+                      <span className="text-emerald-300 font-bold shrink-0">•</span>
+                      <span
+                        className="text-amber-300 font-bold tracking-wide whitespace-nowrap inline-flex items-center"
+                        style={{
+                          color: '#fde047',
+                          WebkitTextFillColor: '#fde047',
+                          WebkitPrintColorAdjust: 'exact',
+                          printColorAdjust: 'exact',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        CR:&nbsp;{shop.crNumber}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
               {qrUri && (

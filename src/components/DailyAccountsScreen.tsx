@@ -149,8 +149,7 @@ export const DailyAccountsScreen: React.FC<DailyAccountsScreenProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black text-slate-950">{shop.name}</h1>
-            <p className="text-xs text-slate-700">{shop.address} | Tel: {shop.phone}</p>
-            <p className="text-[11px] font-semibold text-slate-800">Commercial Registration (CR): {shop.crNumber}</p>
+            <p className="text-xs text-slate-700">{shop.address} | Tel: {shop.phone} | CR: {shop.crNumber}</p>
           </div>
           <div className="text-right">
             <span className="inline-block rounded bg-slate-900 text-white px-2.5 py-1 text-[11px] font-black uppercase">
