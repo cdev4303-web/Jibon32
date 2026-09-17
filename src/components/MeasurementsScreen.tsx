@@ -272,27 +272,29 @@ export const MeasurementsScreen: React.FC<MeasurementsScreenProps> = ({
   return (
     <div className="space-y-6 pb-24 max-w-6xl mx-auto">
       {/* Top Header Card */}
-      <div className="rounded-3xl border border-slate-200 bg-linear-to-r from-slate-900 to-slate-800 p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="rounded-3xl border-2 border-slate-700/60 bg-slate-950 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 p-5 sm:p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="rounded-xl bg-amber-400 p-2 text-slate-950 font-black">
+          <div className="flex items-center gap-3 mb-1.5">
+            <div className="rounded-2xl bg-amber-400 p-2.5 text-slate-950 font-black shadow-md shrink-0 flex items-center justify-center ring-2 ring-amber-300/40">
               <Ruler className="h-6 w-6" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight">
-              {isEn ? 'Measurement System & Profiles' : 'পরিমাপ ও গ্রাহক প্রোফাইল ব্যবস্থাপনা'}
-            </h1>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-amber-400 drop-shadow-sm">
+                {isEn ? 'Measurement System & Profiles' : 'পরিমাপ ও গ্রাহক প্রোফাইল ব্যবস্থাপনা'}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-200 font-medium mt-0.5">
+                {isEn
+                  ? 'One customer can have multiple measurement profiles (e.g. Panjabi Regular, Panjabi Slim, Shirt, Pant, Pajama).'
+                  : 'একই গ্রাহকের একাধিক পরিমাপ প্রোফাইল (যেমন: পাঞ্জাবি রেগুলার, পাঞ্জাবি স্লিম, শার্ট, প্যান্ট, পায়জামা) সংরক্ষণ ও পরিচালনা করুন।'}
+              </p>
+            </div>
           </div>
-          <p className="text-xs sm:text-sm text-slate-300 font-medium">
-            {isEn
-              ? 'One customer can have multiple measurement profiles (e.g. Panjabi Regular, Panjabi Slim, Shirt, Pant, Pajama).'
-              : 'একই গ্রাহকের একাধিক পরিমাপ প্রোফাইল (যেমন: পাঞ্জাবি রেগুলার, পাঞ্জাবি স্লিম, শার্ট, প্যান্ট, পায়জামা) সংরক্ষণ ও পরিচালনা করুন।'}
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={onOpenVisualGuide}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800/80 hover:bg-slate-700 px-3.5 py-2.5 text-xs font-bold text-slate-200 transition cursor-pointer active:scale-95"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800/90 hover:bg-slate-700 px-3.5 py-2.5 text-xs font-bold text-white transition cursor-pointer active:scale-95 shadow-sm"
           >
             <HelpCircle className="h-4 w-4 text-amber-400" />
             <span>{isEn ? 'Visual Measurement Guide' : 'পরিমাপ গাইড'}</span>
