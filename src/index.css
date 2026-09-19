@@ -156,6 +156,9 @@ button:not(:disabled) {
     color-adjust: exact !important;
     box-sizing: border-box !important;
     text-shadow: none !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    text-rendering: optimizeLegibility !important;
   }
 
   /* When isolated print target mode is active on document.body, hide #root and show ONLY #isolated-print-target-root */
@@ -386,8 +389,8 @@ button:not(:disabled) {
   }
 
   .print-invoice-header-emerald h1 {
-    color: #ffffff !important;
-    -webkit-text-fill-color: #ffffff !important;
+    color: var(--shop-profile-text-color, inherit) !important;
+    -webkit-text-fill-color: var(--shop-profile-text-color, inherit) !important;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;

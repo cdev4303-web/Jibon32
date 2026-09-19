@@ -9,6 +9,7 @@ import {
   getMeasurementProfileTitle,
   getFieldsForDressType,
   FIELD_DEFINITIONS,
+  hasEnteredMeasurement,
 } from '../utils/measurementProfiles';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { CatalogSelectModal } from './CatalogSelectModal';
@@ -611,11 +612,15 @@ export const OrderFormScreen: React.FC<OrderFormScreenProps> = ({
       updatedAt: Date.now(),
     };
 
-    // Store immutable snapshot on the invoice
-    const measurementSnapshot = cloneMeasurementSnapshot(activeMeasurementData, invoiceId);
+    // Check if tailor actually filled in measurements
+    const hasMeasurements = hasEnteredMeasurement(activeMeasurementData);
+    // Store immutable snapshot on the invoice ONLY if user entered measurement values
+    const measurementSnapshot = hasMeasurements
+      ? cloneMeasurementSnapshot(activeMeasurementData, invoiceId)
+      : undefined;
 
     // If tailor chose to also save this as a new standalone profile for the customer:
-    if (saveAsNewProfile && customerPhone.trim()) {
+    if (saveAsNewProfile && customerPhone.trim() && hasMeasurements) {
       const newProfile: Measurement = {
         id: `MP-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         profileName: newProfileSaveName.trim() || `${dressType} Profile`,

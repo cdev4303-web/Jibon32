@@ -3,11 +3,20 @@ name: Build Jibon Tailor Android APK
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Allows 1-click manual trigger from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'App Version Name (e.g., 1.0.1)'
+        required: false
+        default: '1.0.0'
+      version_code:
+        description: 'App Version Code (number, leave blank for auto-increment)'
+        required: false
+        default: ''
 
 jobs:
   build-apk:
-    name: Build & Package APK
+    name: Build Signed Release APK
     runs-on: ubuntu-latest
 
     permissions:
@@ -16,6 +25,30 @@ jobs:
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
+
+      - name: 🔢 Calculate Version Code and Version Name
+        id: versioning
+        run: |
+          INPUT_CODE="${{ github.event.inputs.version_code }}"
+          INPUT_NAME="${{ github.event.inputs.version_name }}"
+
+          if [ -n "$INPUT_CODE" ]; then
+            V_CODE="$INPUT_CODE"
+          else
+            # Base 100 + run_number ensures versionCode is always >= 101 and strictly increments on every build
+            V_CODE=$((100 + github.run_number))
+          fi
+
+          if [ -n "$INPUT_NAME" ]; then
+            V_NAME="$INPUT_NAME"
+          else
+            V_NAME="1.0.0"
+          fi
+
+          echo "CALCULATED_VERSION_CODE=$V_CODE" >> $GITHUB_ENV
+          echo "CALCULATED_VERSION_NAME=$V_NAME" >> $GITHUB_ENV
+          echo "Version Code: $V_CODE"
+          echo "Version Name: $V_NAME"
 
       - name: ⚙️ Setup Node.js
         uses: actions/setup-node@v4
@@ -53,27 +86,62 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: 🔨 Build Android APK with Gradle
+      - name: 🔐 Prepare Release Keystore from GitHub Secrets
+        id: prepare-keystore
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Release keystore secret detected. Decoding keystore..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/release.keystore"
+            echo "KEYSTORE_FILE=${{ github.workspace }}/release.keystore" >> $GITHUB_ENV
+            echo "has_keystore=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Notice: KEYSTORE_BASE64 secret is not configured in GitHub Secrets."
+            echo "   Gradle will build using default signing."
+            echo "has_keystore=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: 🔨 Build Signed Release Android APK with Gradle
         working-directory: jibon/android-studio-project
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          KEYSTORE_FILE: ${{ env.KEYSTORE_FILE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          APP_VERSION_CODE: ${{ env.CALCULATED_VERSION_CODE }}
+          APP_VERSION_NAME: ${{ env.CALCULATED_VERSION_NAME }}
         run: |
           echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
-          gradle assembleDebug --stacktrace
+          chmod +x gradlew || true
+          gradle assembleRelease --stacktrace
+
+      - name: 🧹 Secure Cleanup Keystore File
+        if: always()
+        run: |
+          rm -f "${{ github.workspace }}/release.keystore"
+          rm -f jibon/android-studio-project/local.properties
 
       - name: 📂 Prepare APK Files for Download
         run: |
           mkdir -p final-apks
-          # Copy generated APKs to final-apks folder
-          find jibon/android-studio-project/app/build/outputs/apk -name "*.apk" -type f -exec cp -v {} final-apks/ \;
-          echo "Generated APKs:"
+          # Find generated release APK
+          RELEASE_APK=$(find jibon/android-studio-project/app/build/outputs/apk -name "*release*.apk" -type f | head -n 1)
+          if [ -n "$RELEASE_APK" ] && [ -f "$RELEASE_APK" ]; then
+            cp "$RELEASE_APK" "final-apks/Jibon-Tailor-v${CALCULATED_VERSION_NAME}-build${CALCULATED_VERSION_CODE}-release.apk"
+            cp "$RELEASE_APK" "final-apks/Jibon-Tailor-release-latest.apk"
+          fi
+          # Also copy any other generated apks
+          find jibon/android-studio-project/app/build/outputs/apk -name "*.apk" -type f -exec cp -u {} final-apks/ \;
+          echo "Generated APKs in final-apks/:"
           ls -lh final-apks/
 
       - name: 🚀 Upload APK Artifacts to GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: Jibon-Tailor-Android-APK
+          name: Jibon-Tailor-Android-Release-APK
           path: final-apks/*.apk
           retention-days: 30
 
@@ -82,8 +150,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: final-apks/*.apk
-          name: Jibon Tailor Mobile App ${{ github.ref_name }}
+          name: Jibon Tailor Mobile App ${{ github.ref_name }} (v${{ env.CALCULATED_VERSION_NAME }})
           body: |
-            ## 📱 Jibon Tailor Android Application APK
-            Download and install the APK on your Android device:
-            - **`app-debug.apk`** (Ready for direct installation on any Android device)
+            ## 📱 Jibon Tailor Android Application Release APK
+            **Version:** `${{ env.CALCULATED_VERSION_NAME }}` (VersionCode: `${{ env.CALCULATED_VERSION_CODE }}`)
+            **Application ID:** `com.jibontailor.app`
+
+            Install or Update:
+            - **`Jibon-Tailor-v${{ env.CALCULATED_VERSION_NAME }}-build${{ env.CALCULATED_VERSION_CODE }}-release.apk`**
+            - **`Jibon-Tailor-release-latest.apk`**
+
+            *Note: Signed with permanent Release Keystore. App data (WebView, LocalStorage, IndexedDB) will be preserved on update.*

@@ -6,3 +6,15 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Android & Secrets
+*.jks
+*.keystore
+*.key
+signing.properties
+local.properties
+.gradle/
+**/build/
+final-apks/
+*.apk
+*.aab

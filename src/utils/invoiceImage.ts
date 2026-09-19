@@ -2,6 +2,8 @@ import { Invoice, Shop, Language } from '../types';
 import { generateInvoiceQrDataUrl } from './qrcode';
 import { captureElementToPng } from './domCapture';
 import { isAndroidNativeApp, nativeSaveImage } from './nativeBridge';
+import { hasEnteredMeasurement } from './measurementProfiles';
+import { getShopProfileTextColor } from './headerStyle';
 
 /**
  * Safely loads an image from data URI or URL
@@ -82,12 +84,12 @@ export async function generateInvoiceImageUriAsync(
   lang: Language = 'BN'
 ): Promise<string> {
   // 1. High-Fidelity Capture: If live preview element (#printable-area) exists in the DOM,
-  // capture it directly for 100% exact colors, typography, and styling parity.
+  // capture it directly for 100% exact colors, typography, and styling parity with ultra-sharp text.
   const liveEl = document.getElementById('printable-area');
   if (liveEl) {
     try {
       const liveDataUri = await captureElementToPng(liveEl, {
-        pixelRatio: 2.5,
+        pixelRatio: 3.0,
         backgroundColor: '#ffffff',
       });
       if (liveDataUri && liveDataUri.startsWith('data:image/png') && liveDataUri.length > 2500) {
@@ -121,9 +123,10 @@ export async function generateInvoiceImageUriAsync(
     },
   ].filter((p): p is { uri: string; label: string } => Boolean(p.uri && p.uri.length > 5));
 
-  // Calculate dynamic height based on items & photos
+  // Calculate dynamic height based on items, measurements & photos
+  const showMeasurements = hasEnteredMeasurement(invoice.measurement);
   const itemsCount = Math.max(invoice.items?.length || 1, 1);
-  const baseHeight = 1260;
+  const baseHeight = showMeasurements ? 1260 : 1020;
   const extraItemsHeight = (itemsCount - 1) * 36;
   const extraPhotosHeight = attachedPhotos.length > 0 ? 250 : 0;
   const height = baseHeight + extraItemsHeight + extraPhotosHeight;
@@ -173,8 +176,8 @@ export async function generateInvoiceImageUriAsync(
   ctx.fillText('JT', 85, 74);
   ctx.restore();
 
-  // Shop Name
-  ctx.fillStyle = '#FFFFFF';
+  // Shop Name (configured profile text color)
+  ctx.fillStyle = getShopProfileTextColor(shop);
   ctx.font = 'bold 34px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(shop.name.toUpperCase(), (width + 50) / 2, 52);
@@ -393,67 +396,63 @@ export async function generateInvoiceImageUriAsync(
 
   // 6. Measurements & Financial Summary Section
   const midY = currY + 25;
-
-  // Measurements Box (Left side - Styled in blue)
-  ctx.fillStyle = '#F0F7FF';
-  ctx.strokeStyle = '#BFDBFE';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(40, midY, 410, 245, 10);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = '#1E3A8A';
-  ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText(
-    isEn ? '📏 MEASUREMENTS (Inches)' : '📏 MEASUREMENTS (মাপের বিবরণ - ইঞ্চি)',
-    60,
-    midY + 30
-  );
-
   const m = invoice.measurement;
-  const meas = isEn
-    ? [
-        { label: 'Length:', val: m?.length || '56' },
-        { label: 'Chest:', val: m?.bodyChest || '38' },
-        { label: 'Waist:', val: m?.waist || '34' },
-        { label: 'Hip:', val: m?.hip || '42' },
-        { label: 'Shoulder:', val: m?.shoulder || '15' },
-        { label: 'Sleeve:', val: m?.sleeve || '22.5' },
-        { label: 'Neck:', val: m?.neck || '7' },
-        { label: 'Flare:', val: m?.flareBottom || '48' },
-      ]
-    : [
-        { label: 'লম্বা (Length):', val: m?.length || '56' },
-        { label: 'বডি (Chest):', val: m?.bodyChest || '38' },
-        { label: 'কোমর (Waist):', val: m?.waist || '34' },
-        { label: 'হিপ (Hip):', val: m?.hip || '42' },
-        { label: 'পুঁট (Shoulder):', val: m?.shoulder || '15' },
-        { label: 'হাতা (Sleeve):', val: m?.sleeve || '22.5' },
-        { label: 'গলা (Neck):', val: m?.neck || '7' },
-        { label: 'ঘের (Flare):', val: m?.flareBottom || '48' },
-      ];
 
-  let measGridY = midY + 65;
-  meas.forEach((item, i) => {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const x = col === 0 ? 60 : 255;
-    const y = measGridY + row * 40;
-
-    ctx.fillStyle = '#2563EB';
-    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText(item.label, x, y);
+  // Measurements Box (Left side - Styled in blue) - ONLY drawn if measurements exist
+  if (showMeasurements && m) {
+    ctx.fillStyle = '#F0F7FF';
+    ctx.strokeStyle = '#BFDBFE';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(40, midY, 410, 245, 10);
+    ctx.fill();
+    ctx.stroke();
 
     ctx.fillStyle = '#1E3A8A';
-    ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText(`${item.val}"`, x + 115, y);
-  });
+    ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(
+      isEn ? '📏 MEASUREMENTS (Inches)' : '📏 MEASUREMENTS (মাপের বিবরণ - ইঞ্চি)',
+      60,
+      midY + 30
+    );
 
-  // Financials Box (Right side)
-  const finX = 475;
-  const finW = width - 475 - 40;
+    const activeMeasFields: { label: string; val: string | number }[] = [];
+    if (m.length) activeMeasFields.push({ label: isEn ? 'Length:' : 'লম্বা (Length):', val: m.length });
+    if (m.bodyChest) activeMeasFields.push({ label: isEn ? 'Chest:' : 'বডি (Chest):', val: m.bodyChest });
+    if (m.waist) activeMeasFields.push({ label: isEn ? 'Waist:' : 'কোমর (Waist):', val: m.waist });
+    if (m.hip) activeMeasFields.push({ label: isEn ? 'Hip:' : 'হিপ (Hip):', val: m.hip });
+    if (m.shoulder) activeMeasFields.push({ label: isEn ? 'Shoulder:' : 'পুঁট (Shoulder):', val: m.shoulder });
+    if (m.sleeve) activeMeasFields.push({ label: isEn ? 'Sleeve:' : 'হাতা (Sleeve):', val: m.sleeve });
+    if (m.neck) activeMeasFields.push({ label: isEn ? 'Neck:' : 'গলা (Neck):', val: m.neck });
+    if (m.flareBottom) activeMeasFields.push({ label: isEn ? 'Flare:' : 'ঘের (Flare):', val: m.flareBottom });
+    if (m.cuff) activeMeasFields.push({ label: isEn ? 'Cuff:' : 'কাফ (Cuff):', val: m.cuff });
+    if (m.thigh) activeMeasFields.push({ label: isEn ? 'Thigh:' : 'রান (Thigh):', val: m.thigh });
+    if (m.bottom) activeMeasFields.push({ label: isEn ? 'Bottom:' : 'বটম (Bottom):', val: m.bottom });
+    if (m.inseam) activeMeasFields.push({ label: isEn ? 'Inseam:' : 'হাই (Inseam):', val: m.inseam });
+    if (m.collar) activeMeasFields.push({ label: isEn ? 'Collar:' : 'কলার (Collar):', val: m.collar });
+
+    let measGridY = midY + 65;
+    activeMeasFields.slice(0, 8).forEach((item, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = col === 0 ? 60 : 255;
+      const y = measGridY + row * 40;
+
+      ctx.fillStyle = '#2563EB';
+      ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.fillText(item.label, x, y);
+
+      ctx.fillStyle = '#1E3A8A';
+      ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      const suffix = typeof item.val === 'number' ? '"' : '';
+      ctx.fillText(`${item.val}${suffix}`, x + 115, y);
+    });
+  }
+
+  // Financials Box (Right-aligned if measurements exist, centered/right-half styled if not)
+  const finX = showMeasurements ? 475 : 440;
+  const finW = showMeasurements ? width - 475 - 40 : 420;
   const finBoxH = 245;
 
   ctx.fillStyle = '#FFFFFF';

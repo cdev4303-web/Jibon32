@@ -218,3 +218,40 @@ export const getHeaderTitleStyle = (config?: HeaderColorConfig): React.CSSProper
     textShadow: textShadow !== 'none' ? textShadow : undefined,
   };
 };
+
+/**
+ * Resolves the shop profile title and banner text color configured in Settings.
+ * Supports explicit profileTextColor, custom header styles, presets, and clean fallback.
+ */
+export function getShopProfileTextColor(
+  shop?: { profileTextColor?: string; headerStyle?: HeaderColorConfig } | null
+): string {
+  if (!shop) return '#ffffff';
+
+  // 1. Explicit profileTextColor set in Settings -> Shop Profile (দোকানের প্রোফাইল ব্যানার লেখার কালার)
+  if (shop.profileTextColor && typeof shop.profileTextColor === 'string' && shop.profileTextColor.trim()) {
+    return shop.profileTextColor.trim();
+  }
+
+  // 2. Check if a header style is explicitly customized
+  if (shop.headerStyle) {
+    if (shop.headerStyle.colorMode === 'solid' && shop.headerStyle.solidColor) {
+      return shop.headerStyle.solidColor;
+    }
+    if (shop.headerStyle.colorMode === 'preset') {
+      const preset = HEADER_COLOR_PRESETS.find((p) => p.id === shop.headerStyle?.presetId);
+      if (preset && preset.id !== 'classic-emerald') {
+        if (preset.solidColor) return preset.solidColor;
+        if (preset.id === 'golden-luxury' || preset.id === 'emerald-gold') return '#fbbf24';
+        if (preset.id === 'sunset-crimson') return '#f59e0b';
+        if (preset.id === 'ocean-cyan') return '#38bdf8';
+        if (preset.id === 'royal-purple-pink') return '#f43f5e';
+        if (preset.id === 'cyber-neon') return '#a3e635';
+        if (preset.id === 'ruby-rose') return '#fb7185';
+      }
+    }
+  }
+
+  return '#ffffff';
+}
+

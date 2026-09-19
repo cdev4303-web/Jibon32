@@ -38,7 +38,8 @@ export async function captureElementToPng(
     defaultWidth = 880;
   }
   const targetWidth = options.width || defaultWidth;
-  const pixelRatio = options.pixelRatio || 2.0;
+  // High-density crystal clear rendering (3.0 for pin-sharp text on mobile and desktop)
+  const pixelRatio = options.pixelRatio || 3.0;
   const backgroundColor = options.backgroundColor || '#ffffff';
 
   // 1. Create a clean offscreen mount sandbox attached to document.body
@@ -112,8 +113,18 @@ export async function captureElementToPng(
 
     const h1 = h.querySelector('h1');
     if (h1) {
-      h1.style.color = '#ffffff';
-      (h1.style as any).webkitTextFillColor = '#ffffff';
+      const origH1 = el.querySelector('.print-invoice-header-emerald h1') as HTMLElement | null;
+      const profileColor =
+        origH1?.style.color ||
+        origH1?.style.getPropertyValue('--shop-profile-text-color') ||
+        h.style.getPropertyValue('--shop-profile-text-color') ||
+        h1.style.color ||
+        '#ffffff';
+      h1.style.color = profileColor;
+      (h1.style as any).webkitTextFillColor = profileColor;
+      if (origH1?.style.textShadow) {
+        h1.style.textShadow = origH1.style.textShadow;
+      }
     }
 
     const contactRow = h.querySelector('.header-contact-row') as HTMLElement | null;
@@ -143,7 +154,16 @@ export async function captureElementToPng(
   document.body.appendChild(sandbox);
 
   try {
-    // 3. Ensure any <img> tags inside the clone are fully decoded before capture
+    // 3. Guarantee all web fonts (Bengali / English) are fully loaded and ready
+    if ('fonts' in document) {
+      try {
+        await (document as any).fonts.ready;
+      } catch (fontErr) {
+        console.warn('[DOM Capture] font ready check skipped:', fontErr);
+      }
+    }
+
+    // 4. Ensure any <img> tags inside the clone are fully decoded before capture
     const imgs = Array.from(clone.querySelectorAll('img'));
     if (imgs.length > 0) {
       await Promise.all(
@@ -158,7 +178,7 @@ export async function captureElementToPng(
       );
     }
 
-    // 4. Measure exact full content height without any cutoff
+    // 5. Measure exact full content height without any cutoff
     const fullHeight = Math.max(
       clone.scrollHeight,
       clone.offsetHeight,
@@ -166,6 +186,7 @@ export async function captureElementToPng(
     );
 
     // Primary Capture: html-to-image (Native browser SVG foreignObject engine)
+    // skipFonts: false guarantees actual custom web fonts are rasterized at native crystal clarity
     try {
       const dataUrl = await htmlToImage.toPng(clone, {
         pixelRatio,
@@ -175,7 +196,7 @@ export async function captureElementToPng(
         canvasWidth: Math.round(targetWidth * pixelRatio),
         canvasHeight: Math.round(fullHeight * pixelRatio),
         cacheBust: false,
-        skipFonts: true,
+        skipFonts: false,
         style: {
           width: `${targetWidth}px`,
           height: `${fullHeight}px`,
@@ -184,7 +205,10 @@ export async function captureElementToPng(
           transform: 'none',
           margin: '0',
           backgroundColor,
-        },
+          // Enhance font rendering in CSS during capture
+          fontSmooth: 'always',
+          textRendering: 'optimizeLegibility',
+        } as any,
       });
 
       if (dataUrl && dataUrl.startsWith('data:image/png') && dataUrl.length > 2000) {
@@ -194,7 +218,7 @@ export async function captureElementToPng(
       console.warn('[DOM Capture] html-to-image capture fallback trigger:', primaryErr);
     }
 
-    // Secondary Method: html2canvas fallback with exact coordinate mapping
+    // Secondary Method: html2canvas fallback with exact coordinate mapping & font smoothing
     try {
       const canvas = await html2canvas(clone, {
         scale: pixelRatio,
@@ -210,6 +234,15 @@ export async function captureElementToPng(
         y: 0,
         scrollX: 0,
         scrollY: 0,
+        onclone: (clonedDoc) => {
+          // Guarantee anti-aliasing in cloned canvas document
+          const clonedEl = clonedDoc.getElementById(clone.id);
+          if (clonedEl) {
+            clonedEl.style.textRendering = 'optimizeLegibility';
+            (clonedEl.style as any).webkitFontSmoothing = 'antialiased';
+            (clonedEl.style as any).mozOsxFontSmoothing = 'grayscale';
+          }
+        },
       });
 
       const fallbackUrl = canvas.toDataURL('image/png');

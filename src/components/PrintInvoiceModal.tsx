@@ -8,6 +8,8 @@ import { generateInvoiceQrDataUrl } from '../utils/qrcode';
 import { printHtmlElement, exportElementToPdf, isIframeEnvironment } from '../utils/print';
 import { captureElementToPng } from '../utils/domCapture';
 import { downloadImageFromUri, generateInvoiceImageUriAsync } from '../utils/invoiceImage';
+import { hasEnteredMeasurement } from '../utils/measurementProfiles';
+import { getShopProfileTextColor } from '../utils/headerStyle';
 
 interface PrintInvoiceModalProps {
   isOpen: boolean;
@@ -32,6 +34,8 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingPng, setIsGeneratingPng] = useState(false);
   const [isSharingPng, setIsSharingPng] = useState(false);
+
+  const profileTextColor = getShopProfileTextColor(shop);
 
   useEffect(() => {
     if (invoice && isOpen) {
@@ -86,7 +90,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
       let dataUri: string | null = null;
       try {
         dataUri = await captureElementToPng('printable-area', {
-          pixelRatio: 2.0,
+          pixelRatio: 3.0,
           backgroundColor: '#ffffff',
         });
       } catch (domErr) {
@@ -112,7 +116,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
       let dataUri: string | null = null;
       try {
         dataUri = await captureElementToPng('printable-area', {
-          pixelRatio: 2.0,
+          pixelRatio: 3.0,
           backgroundColor: '#ffffff',
         });
       } catch (domErr) {
@@ -134,6 +138,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
   };
 
   const m = invoice.measurement;
+  const showMeasurements = hasEnteredMeasurement(m);
 
   return (
     <>
@@ -287,19 +292,21 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                 borderBottom: '4px solid #f59e0b',
                 WebkitPrintColorAdjust: 'exact',
                 printColorAdjust: 'exact',
+                ['--shop-profile-text-color' as any]: profileTextColor,
               }}
             >
               <div className="flex items-center gap-3.5 flex-1 min-w-0">
                 <Logo size="lg" className="shrink-0" />
                 <div className="text-left text-white flex-1 min-w-0">
                   <h1
-                    className="text-2xl sm:text-3xl font-black tracking-wide text-white leading-tight uppercase drop-shadow-xs"
+                    className="text-2xl sm:text-3xl font-black tracking-wide leading-tight uppercase drop-shadow-xs"
                     style={{
-                      color: '#ffffff',
-                      WebkitTextFillColor: '#ffffff',
+                      color: profileTextColor,
+                      WebkitTextFillColor: profileTextColor,
                       textShadow: '0 1px 2px rgba(0,0,0,0.5)',
                       WebkitPrintColorAdjust: 'exact',
                       printColorAdjust: 'exact',
+                      ['--shop-profile-text-color' as any]: profileTextColor,
                     }}
                   >
                     {shop.name}
@@ -313,6 +320,11 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                       printColorAdjust: 'exact',
                     }}
                   >
+                    {shop.tagline && (
+                      <div className="text-[11px] font-semibold text-amber-300 mb-0.5 tracking-wide">
+                        {shop.tagline}
+                      </div>
+                    )}
                     <div className="leading-snug text-emerald-100">{shop.address}</div>
                     <div
                       className="header-contact-row flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 font-semibold text-xs"
@@ -430,10 +442,10 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             </table>
 
             {/* Sizing & Totals Split */}
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
-              {/* Measurement Snapshot (Blue Accent) */}
-              <div className="text-xs print-card-measurement print-avoid-break">
-                {m ? (
+            <div className={`mt-4 grid gap-4 ${showMeasurements ? 'grid-cols-1 md:grid-cols-2 print:grid-cols-2' : 'grid-cols-1 max-w-md ml-auto'}`}>
+              {/* Measurement Snapshot (Blue Accent) - ONLY shown when measurements were actually entered */}
+              {showMeasurements && m && (
+                <div className="text-xs print-card-measurement print-avoid-break">
                   <div className="rounded-xl border-2 border-blue-200 p-3 bg-blue-50/60 shadow-2xs">
                     <div className="flex items-center justify-between border-b border-blue-200 pb-1.5 mb-2">
                       <span className="font-bold text-blue-950 uppercase text-[10px]">
@@ -446,14 +458,14 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] leading-normal">
-                      <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Length: ' : 'লম্বা: '}</span><span className="font-black text-blue-950">{m.length}"</span></div>
-                      <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Chest: ' : 'বডি: '}</span><span className="font-black text-blue-950">{m.bodyChest}"</span></div>
-                      <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Waist: ' : 'কোমর: '}</span><span className="font-black text-blue-950">{m.waist}"</span></div>
-                      <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Hip: ' : 'হিপ: '}</span><span className="font-black text-blue-950">{m.hip}"</span></div>
-                      <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Shoulder: ' : 'কাঁধ: '}</span><span className="font-black text-blue-950">{m.shoulder}"</span></div>
-                      <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Sleeve: ' : 'হাতা: '}</span><span className="font-black text-blue-950">{m.sleeve}"</span></div>
-                      <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Neck: ' : 'গলা: '}</span><span className="font-black text-blue-950">{m.neck}"</span></div>
-                      <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Flare: ' : 'ঘের: '}</span><span className="font-black text-blue-950">{m.flareBottom}"</span></div>
+                      {m.length > 0 && <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Length: ' : 'লম্বা: '}</span><span className="font-black text-blue-950">{m.length}"</span></div>}
+                      {m.bodyChest > 0 && <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Chest: ' : 'বডি: '}</span><span className="font-black text-blue-950">{m.bodyChest}"</span></div>}
+                      {m.waist > 0 && <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Waist: ' : 'কোমর: '}</span><span className="font-black text-blue-950">{m.waist}"</span></div>}
+                      {m.hip > 0 && <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Hip: ' : 'হিপ: '}</span><span className="font-black text-blue-950">{m.hip}"</span></div>}
+                      {m.shoulder > 0 && <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Shoulder: ' : 'কাঁধ: '}</span><span className="font-black text-blue-950">{m.shoulder}"</span></div>}
+                      {m.sleeve > 0 && <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Sleeve: ' : 'হাতা: '}</span><span className="font-black text-blue-950">{m.sleeve}"</span></div>}
+                      {m.neck > 0 && <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Neck: ' : 'গলা: '}</span><span className="font-black text-blue-950">{m.neck}"</span></div>}
+                      {m.flareBottom > 0 && <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Flare: ' : 'ঘের: '}</span><span className="font-black text-blue-950">{m.flareBottom}"</span></div>}
                       {m.cuff ? <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Cuff: ' : 'কাফ: '}</span><span className="font-black text-blue-950">{m.cuff}"</span></div> : null}
                       {m.thigh ? <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Thigh: ' : 'রান: '}</span><span className="font-black text-blue-950">{m.thigh}"</span></div> : null}
                       {m.bottom ? <div><span className="text-blue-700 font-semibold">{lang === 'EN' ? 'Bottom: ' : 'বটম: '}</span><span className="font-black text-blue-950">{m.bottom}"</span></div> : null}
@@ -465,12 +477,8 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                     </div>
                     {m.designNotes && <p className="mt-2 text-[10px] text-blue-900 border-t border-blue-200 pt-1.5 italic leading-normal"><strong>{lang === 'EN' ? 'Notes: ' : 'নোট: '}</strong>{m.designNotes}</p>}
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-slate-200 p-3.5 text-slate-400 text-center">
-                    {lang === 'EN' ? 'Standard measurements applied' : 'স্ট্যান্ডার্ড মাপ প্রযোজ্য'}
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Financials Summary - SOLID TABULAR STRUCTURE (NEVER OVERLAPS) */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 text-xs print-card-financials print-avoid-break">

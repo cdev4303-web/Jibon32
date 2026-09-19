@@ -7,6 +7,7 @@ import { generateInvoiceQrDataUrl } from '../utils/qrcode';
 import { InvoiceImageModal } from './InvoiceImageModal';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { compressImageFile, compressDataUri } from '../utils/imageCompressor';
+import { hasEnteredMeasurement } from '../utils/measurementProfiles';
 import { Logo } from './Logo';
 import {
   ArrowLeft,
@@ -781,8 +782,8 @@ export const InvoiceDetailScreen: React.FC<InvoiceDetailScreenProps> = ({
         </div>
       </div>
 
-      {/* Measurements Card (Rich Blue theme styling) */}
-      {m && (
+      {/* Measurements Card (Rich Blue theme styling) - only shown when measurements exist */}
+      {m && hasEnteredMeasurement(m) && (
         <div className="rounded-2xl border-2 border-blue-200 bg-white p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-blue-100 pb-2">
             <div className="flex items-center gap-2">

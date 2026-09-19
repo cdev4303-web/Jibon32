@@ -108,6 +108,42 @@ export function cloneMeasurementSnapshot(
 }
 
 /**
+ * Checks if a measurement profile contains any entered measurement values or notes.
+ * Returns false if all numeric values are 0 or empty.
+ */
+export function hasEnteredMeasurement(m?: Partial<Measurement> | null): boolean {
+  if (!m) return false;
+  const numFields: (keyof Measurement)[] = [
+    'length',
+    'bodyChest',
+    'waist',
+    'hip',
+    'shoulder',
+    'sleeve',
+    'neck',
+    'cuff',
+    'thigh',
+    'bottom',
+    'inseam',
+    'flareBottom',
+  ];
+  const hasNum = numFields.some((f) => {
+    const val = m[f];
+    return typeof val === 'number' && val > 0;
+  });
+  if (hasNum) return true;
+
+  if (m.collar && m.collar.trim()) return true;
+  if (m.designNotes && m.designNotes.trim()) return true;
+  if (m.specialInstructions && m.specialInstructions.trim()) return true;
+  if (m.customFields && m.customFields.some((cf) => cf.name?.trim() && cf.value?.trim())) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Filter all measurement profiles belonging to a specific customer
  * matches by normalized phone number or customer name.
  */
