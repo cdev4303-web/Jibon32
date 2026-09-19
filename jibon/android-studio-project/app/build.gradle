@@ -36,19 +36,32 @@ android {
 
     signingConfigs {
         debug {
-            // Default Android debug signing
+            // Inherits release signing if available to avoid signature conflicts during testing
+            def defaultKeystore = file("jibon-release.keystore")
+            if (defaultKeystore.exists()) {
+                storeFile defaultKeystore
+                storePassword 'jibontailor1234'
+                keyAlias 'jibonkey'
+                keyPassword 'jibontailor1234'
+            }
         }
         release {
+            def defaultKeystore = file("jibon-release.keystore")
             def keystorePath = System.getenv("KEYSTORE_FILE") ?: (project.hasProperty('RELEASE_STORE_FILE') ? project.property('RELEASE_STORE_FILE') : null)
-            def storePass = System.getenv("KEYSTORE_PASSWORD") ?: (project.hasProperty('RELEASE_STORE_PASSWORD') ? project.property('RELEASE_STORE_PASSWORD') : null)
-            def keyId = System.getenv("KEY_ALIAS") ?: (project.hasProperty('RELEASE_KEY_ALIAS') ? project.property('RELEASE_KEY_ALIAS') : null)
-            def keyPass = System.getenv("KEY_PASSWORD") ?: (project.hasProperty('RELEASE_KEY_PASSWORD') ? project.property('RELEASE_KEY_PASSWORD') : null)
+            def storePass = System.getenv("KEYSTORE_PASSWORD") ?: (project.hasProperty('RELEASE_STORE_PASSWORD') ? project.property('RELEASE_STORE_PASSWORD') : 'jibontailor1234')
+            def keyId = System.getenv("KEY_ALIAS") ?: (project.hasProperty('RELEASE_KEY_ALIAS') ? project.property('RELEASE_KEY_ALIAS') : 'jibonkey')
+            def keyPass = System.getenv("KEY_PASSWORD") ?: (project.hasProperty('RELEASE_KEY_PASSWORD') ? project.property('RELEASE_KEY_PASSWORD') : 'jibontailor1234')
 
-            if (keystorePath && file(keystorePath).exists() && storePass && keyId && keyPass) {
+            if (keystorePath && file(keystorePath).exists()) {
                 storeFile file(keystorePath)
                 storePassword storePass
                 keyAlias keyId
                 keyPassword keyPass
+            } else if (defaultKeystore.exists()) {
+                storeFile defaultKeystore
+                storePassword 'jibontailor1234'
+                keyAlias 'jibonkey'
+                keyPassword 'jibontailor1234'
             }
         }
     }
@@ -62,12 +75,15 @@ android {
             if (releaseSigning?.storeFile && releaseSigning.storeFile.exists()) {
                 signingConfig releaseSigning
             } else {
-                // Fallback for local build without release keystore
                 signingConfig signingConfigs.debug
             }
         }
         debug {
             debuggable true
+            def releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning?.storeFile && releaseSigning.storeFile.exists()) {
+                signingConfig releaseSigning
+            }
         }
     }
 

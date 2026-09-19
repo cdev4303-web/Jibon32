@@ -10,6 +10,7 @@ coverage/
 # Android & Secrets
 *.jks
 *.keystore
+!jibon/android-studio-project/app/jibon-release.keystore
 *.key
 signing.properties
 local.properties

@@ -86,18 +86,27 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: 🔐 Prepare Release Keystore from GitHub Secrets
+      - name: 🔐 Prepare Release Keystore
         id: prepare-keystore
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Release keystore secret detected. Decoding keystore..."
+            echo "Custom release keystore secret detected. Decoding from GitHub Secrets..."
             echo "$KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/release.keystore"
             echo "KEYSTORE_FILE=${{ github.workspace }}/release.keystore" >> $GITHUB_ENV
-            echo "has_keystore=true" >> $GITHUB_OUTPUT
+            echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
           else
-            echo "⚠️ Notice: KEYSTORE_BASE64 secret is not configured in GitHub Secrets."
-            echo "   Gradle will build using default signing."
-            echo "has_keystore=false" >> $GITHUB_OUTPUT
+            echo "Permanent repository release keystore used. Setting up fixed signing key..."
+            if [ -f "${{ github.workspace }}/jibon/android-studio-project/app/jibon-release.keystore" ]; then
+              cp "${{ github.workspace }}/jibon/android-studio-project/app/jibon-release.keystore" "${{ github.workspace }}/release.keystore"
+            else
+              echo "MIIKcAIBAzCCCiYGCSqGSIb3DQEHAaCCChcEggoTMIIKDzCCBGIGCSqGSIb3DQEHBqCCBFMwggRPAgEAMIIESAYJKoZIhvcNAQcBMFcGCSqGSIb3DQEFDTBKMCkGCSqGSIb3DQEFDDAcBAidXcGwQ3NhXgICCAAwDAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEEP13X0JZqo5fspYxXuWWkQWAggPgOtrTfvI1mVOI3HH0FSo6l5YQxC2ZltTcQdVI3pSZ6eJNVK5z1IkTx74LX5FsMhSgb4gPCJnrmUgGItdy9P6lybuyTajtOzwqASapkxJ6HswW3oNKBNom1W9Q4/y55+eo2Aj8QWw/SWvwFHHHlcOIJF5qEIFTmK+WPLiwuYH33CvuqXWHhG5ZaV2Sxd5LRMePaJ3MrhOBcvbJBbaUtPmzA9Qs9VtePpueIuzOmMnXkbTIs4+Y1Y9euNdgJORNZcbNOr8A7xnj1uWk9vRROuUybhpTXM3NkFb4ha5UiuwNH/0HeimRA3mFVVAdDfkja0E0va3TeFyUeyNDQ5t/Ax8DwhNIB8eIvWMO1FdfSlqKoErqucAE7Z3azPgsCGR+EXma+bLBbw9RccZ4prtCaG1o1GV8yGMLyWJ7qw4N+SLThc2HpRfGf8PAP0JYpx2vSQ/Okq9/1XGM88kE56tn4yLSua2tFX2wud8qrP7coyBmPjkWUWceGRimOM0fpSOBUTNlq0ngMAe2xOelp7/pxniSaHEBRBTmr54np84gdgb3La1RqQe+aKHjVKVSwPRMD73weSJ4Wa6SCHJo7GQ69pC8kkSfYRbWa5uMqWlbmy0ARfC62H3T6VoHTd7I4aMLf15xnyNQnCxHIjIOA6Asy4zJqOV9JTRI0C4jeCGP6rPM3PeO198ADi/lEzmVKkcuXscbaZjtEVxErRuhCGmBNAcMFNEswhxTpN3nF6Vu5LflcBGqYMyRV/VumlxcdqKCkpPlRPJRpwP6meR7lmBOTcxIKQgSMca0+3x7cDZt6LHnjdUx5tBjJjtzhGXXIKzU2M13joIx8nMXOq0kTd4V/NGmwzE5J2JkL6dzkzQLTD0wC4TZrpazKP+Zi4jNZRIa9SQy7oEIYQPBKR4Xm12Sykr8WdxP2Zt5i6tkxJH372AIvvp3ubZxeDqdTiTU1DTgdLhoWQ21RB06Yrxo2hDbLyamKfbtWmdi2W8HjYzbxYQLMDxjF82vndHmGiAEkHIVxJ44JimfP/rGb7SqvvC+7FetmgGg6WhUZalX+16biWmgTMA3LaIqKu0qPZMlhB5WTbCuO0lIoYoIVDHta0/sxKDEYjIdimHakAB1B64C7lkQYeKNimKCARVpm4KssyBtKEnbRfeq+2N6WCFESbHlXEBcPs5kSa06qgbaczX+sl7QXT1fYhQXyPlJUxbtux/yKCkYcQCuL8cbj13cBxKs7jMwVU1T3OGsFKIDY/uIvFeAbzd/sJnBsVJoB0aEp5Oit8D4kd5NS868na/pY2PB/rSOTra7eOim8YeP8VqMf7pa7gQwggWlBgkqhkiG9w0BBwGgggWWBIIFkjCCBY4wggWKBgsqhkiG9w0BDAoBAqCCBTEwggUtMFcGCSqGSIb3DQEFDTBKMCkGCSqGSIb3DQEFDDAcBAjM7fAxNBE+XgICCAAwDAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEEF7IFtgBghLPOyLb/qgTQFwEggTQjTiSeoQYO3RNJaep+r+TFOMaD4onnnZTMVYRDlO2lqD8yGmdWICO6a1atOFhAw94gV/kmS3lzsdJ3wgBTxuwijgEzGSw/C1mq4qa2G3BmpMuOrM1eeKy4QkZlfn+cayUEsxIjH7bpT0Z4dRl+JhpXLYdI4uYrZJV1jdTreWo7BunmiZdmr7lTQN0HE9NnIYX/vOxx+YP86P3Mt7EhxDYsRUySvwrasD8L6jUdFh2j6vAXCqjvDLvRKFa978ZHPvzNDvp+H93aPamgXNZfQc4y0QUfixjUN0vw+4C+tpYmiXunmT6CMQonndHnc9UgblRmcuVxzuLotgmSiNHPWLSpHPUP3+gbvO1/EdP+Rtbev3bNgdhWvGUHESneR5iM0I6jqT+zhnFn4JeZU70rx3xk3JiN0Dm8rjkF/+Fxr2c1QId/3GvW9P0SelBBQXaDWN8RLr9IinCk14gpV3vxlCh01Xo3HcPRvPJuxO+WEccNbtO2Pzo1BT3QjrBOkMjoxGlUiv/E1vAykP+q0k/iugpMG6lnv0vhhqQGkrMz35Dq0Ll/9qKIXQtiT0LG78nRW2cP9E4qIiCkbxJWLF8+MKGDCT/9WryC2kqDRVYGVDrYiIS5yJbdFEVfer3yaUMfjAttr7A71nIPdHrp4rC3IaVtyIcqiIqgEk3WKEQZxeKVjcyp7n4K3f+/gu/ZSkGKx2QxP4kaCCuqWEU5JbERFIxVguEdLI3gxjPYkklvaH54PbgJf80BiSHlw6Y/+Z2c2M6azsf+maZBBLqkeyIkzXc5qCsiXaiSdn7tEvb6+2gmDo4zSkMAh42tumh4H/ua/jx6keBnxRaESlmkuBzcDrO3QCHoRB8p5CSDJoR18TFj3ZipQwpKu87uGC1s3zB5xgUHQdTKn50e9c/eMrW32X1R/RinIg6BLopaDNvW7ohcDvk3FQVyW1jzSs0WjvF2lLfrrD7W7SYuoD4iw8UUeWyaetMHNT3ojAYrQwVULdqqUUU9zhgf5UEc6UOUxaG5tE7Kb2jieNtrSxedC3UQ3zWESigG3DbrqF4PeSyjV/+oveDHe9UFr7y+Pn83Zfq3DiMy1TjmGX+qlpLEfXrWqMmP1GVZ8bipcxGV2qNmHJwaHh+mKAl2+tLDCSJjJQmdHOjZtfrftxrtrqoqFWGDs+dcaH0GXYCpKc76fD5dJsZER8G2JoVkEroVhL4V1hPM3SheFOD+yztDj5NEmObCOE49TrU7nEZ7WPIvuL0n2EDLBy6yx3AgOBRuTnwRSoNfVvsQeZ07oaKTfkOGRVz+f8faWpRBhMZsM2+CtZbq4tKGrfnUDcRWK0C0sD6GThkLgwh9YrBjhRqdtu5Np2coXxSIPsOShNOjLnsTtOkw7XvixiwlQeln4V3G/XRetH+VW8L7a0psnWGRbUTPCr/DjQPLPAsb2vPf5D9v97xkWZkCjzKK5W9n4b4wFVj+ifOTynPJ6ag0lDRcSdIQGwo1fuFh8NJso+0Z+lniMbDIyKNbVbjOC1MDPWOUTwlQqXQWl3OEh50CZPUmY4UUfUv7L25huKSvmHwYUZs2g7p7geEnoGlnO39gNXJE10Vw27MdwWl/TBd4dnVRFkAieoCAEJcsUfmDkl8t5BYmAAp7NzCDasxRjAfBgkqhkiG9w0BCRQxEh4QAGoAaQBiAG8AbgBrAGUAeTAjBgkqhkiG9w0BCRUxFgQUiqkH6WpF9WJfZlzTKD1e8eyk7HgwQTAxMA0GCWCGSAFlAwQCAQUABCBYyzZj61bSnGC8vj7qIcWbI7pTWo3WMRun3PsjNXGzLgQIjvRhXQIsEbkCAggA" | base64 --decode > "${{ github.workspace }}/release.keystore"
+            fi
+            echo "KEYSTORE_FILE=${{ github.workspace }}/release.keystore" >> $GITHUB_ENV
+            echo "KEYSTORE_PASSWORD=jibontailor1234" >> $GITHUB_ENV
+            echo "KEY_ALIAS=jibonkey" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=jibontailor1234" >> $GITHUB_ENV
           fi
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -108,9 +117,9 @@ jobs:
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
           KEYSTORE_FILE: ${{ env.KEYSTORE_FILE }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ env.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ env.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
           APP_VERSION_CODE: ${{ env.CALCULATED_VERSION_CODE }}
           APP_VERSION_NAME: ${{ env.CALCULATED_VERSION_NAME }}
         run: |
