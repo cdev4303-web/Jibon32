@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Shop, Invoice, Language } from '../types';
 import {
   parseInvoiceWithAi,
@@ -6,6 +6,7 @@ import {
   buildBilingualInvoiceText,
   convertDraftToInvoice,
 } from '../utils/aiInvoiceParser';
+import { startVoiceCapture, ActiveVoiceSession } from '../utils/nativeVoiceRecognizer';
 import {
   Sparkles,
   Mic,
@@ -73,66 +74,50 @@ export const AiSmartInvoiceAssistant: React.FC<AiSmartInvoiceAssistantProps> = (
     },
   ];
 
-  // Speech Recognition
+  const activeVoiceSessionRef = useRef<ActiveVoiceSession | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (activeVoiceSessionRef.current) {
+        activeVoiceSessionRef.current.stop();
+      }
+    };
+  }, []);
+
+  // Speech Recognition (Native APK & Web)
   const handleToggleVoice = () => {
     if (isListening) {
+      if (activeVoiceSessionRef.current) {
+        activeVoiceSessionRef.current.stop();
+        activeVoiceSessionRef.current = null;
+      }
       setIsListening(false);
       return;
     }
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setErrorMsg(
-        isEn
-          ? 'Voice recognition not supported in this browser. Please type your prompt.'
-          : 'এই ব্রাউজারে ভয়েস সাপোর্ট নেই। অনুগ্রহ করে টাইপ করে লিখুন।'
-      );
-      setTimeout(() => setErrorMsg(null), 4000);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = isEn ? 'en-US' : 'bn-BD';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
+    setErrorMsg(null);
+    activeVoiceSessionRef.current = startVoiceCapture({
+      language: isEn ? 'en-US' : 'bn-BD',
+      contextTag: 'ai_smart_invoice',
+      onStart: () => {
         setIsListening(true);
-        setErrorMsg(null);
-      };
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results?.[0]?.[0]?.transcript;
-        if (transcript) {
+      },
+      onResult: (transcript) => {
+        setIsListening(false);
+        if (transcript && transcript.trim()) {
           setPrompt(transcript);
           handleGenerateInvoice(transcript);
         }
+      },
+      onError: (errText) => {
         setIsListening(false);
-      };
-
-      recognition.onerror = () => {
-        setIsListening(false);
-        setErrorMsg(
-          isEn
-            ? 'Could not capture voice clearly. Please try typing.'
-            : 'ভয়েস পরিষ্কার বোঝা যায়নি। অনুগ্রহ করে লিখে দিন।'
-        );
+        setErrorMsg(errText);
         setTimeout(() => setErrorMsg(null), 4000);
-      };
-
-      recognition.onend = () => {
+      },
+      onEnd: () => {
         setIsListening(false);
-      };
-
-      recognition.start();
-    } catch {
-      setIsListening(false);
-      setErrorMsg(isEn ? 'Microphone permission denied.' : 'মাইক্রোফোন চালু করা যায়নি।');
-      setTimeout(() => setErrorMsg(null), 4000);
-    }
+      },
+    });
   };
 
   // Submit AI Prompt
@@ -421,7 +406,7 @@ export const AiSmartInvoiceAssistant: React.FC<AiSmartInvoiceAssistantProps> = (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">
               <span className="text-[11px] font-bold text-slate-500 uppercase">{isEn ? 'Item' : 'পোশাক'}</span>
               <p className="text-sm font-black text-slate-900 mt-0.5">
-                {draft.items[0]?.quantity || 1}টি {draft.dressType}
+                {draft.items[0]?.quantity || 1} {isEn ? 'item(s)' : 'টি'} {draft.dressType}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-center">

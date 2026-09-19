@@ -33,9 +33,12 @@ import {
   MicOff,
   Wand2,
   Bot,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { parseInvoiceWithAi, AiInvoiceDraft } from '../utils/aiInvoiceParser';
 import { compressImageFile, compressDataUri } from '../utils/imageCompressor';
+import { startVoiceCapture, ActiveVoiceSession } from '../utils/nativeVoiceRecognizer';
 
 interface OrderFormScreenProps {
   shop: Shop;
@@ -220,10 +223,12 @@ export const OrderFormScreen: React.FC<OrderFormScreenProps> = ({
   }, [availableCustomerProfiles, initialInvoice]);
 
   // AI Voice & Text Invoice Assistant States
+  const [isAiManagerOpen, setIsAiManagerOpen] = useState(false);
   const [aiInvoicePrompt, setAiInvoicePrompt] = useState('');
   const [isGeneratingAiInvoice, setIsGeneratingAiInvoice] = useState(false);
   const [isAiListening, setIsAiListening] = useState(false);
   const [aiVoiceError, setAiVoiceError] = useState<string | null>(null);
+  const activeVoiceSessionRef = useRef<ActiveVoiceSession | null>(null);
   const [aiSuccessToast, setAiSuccessToast] = useState<{
     summaryBn: string;
     summaryEn: string;
@@ -233,60 +238,49 @@ export const OrderFormScreen: React.FC<OrderFormScreenProps> = ({
     currency: string;
   } | null>(null);
 
-  // Web Speech API recognition for voice input
+  // Clean up any active voice session on unmount
+  useEffect(() => {
+    return () => {
+      if (activeVoiceSessionRef.current) {
+        activeVoiceSessionRef.current.stop();
+      }
+    };
+  }, []);
+
+  // Voice recognition handler supporting both Native Android APK and Web Browsers
   const handleToggleAiVoice = () => {
     if (isAiListening) {
+      if (activeVoiceSessionRef.current) {
+        activeVoiceSessionRef.current.stop();
+        activeVoiceSessionRef.current = null;
+      }
       setIsAiListening(false);
       return;
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setAiVoiceError(
-        isEn
-          ? 'Voice recognition is not supported in this browser. Please type your prompt.'
-          : 'এই ব্রাউজারে ভয়েস সাপোর্ট নেই। অনুগ্রহ করে লিখে দিন।'
-      );
-      setTimeout(() => setAiVoiceError(null), 4000);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = isEn ? 'en-US' : 'bn-BD';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
+    setAiVoiceError(null);
+    activeVoiceSessionRef.current = startVoiceCapture({
+      language: isEn ? 'en-US' : 'bn-BD',
+      contextTag: 'order_form_ai',
+      onStart: () => {
         setIsAiListening(true);
-        setAiVoiceError(null);
-      };
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript) {
+      },
+      onResult: (transcript) => {
+        setIsAiListening(false);
+        if (transcript && transcript.trim()) {
           setAiInvoicePrompt(transcript);
           handleApplyAiInvoice(transcript);
         }
+      },
+      onError: (errMsg) => {
         setIsAiListening(false);
-      };
-
-      recognition.onerror = () => {
-        setIsAiListening(false);
-        setAiVoiceError(isEn ? 'Could not hear voice clearly. Please try typing.' : 'ভয়েস পরিষ্কার শোনা যায়নি। অনুগ্রহ করে লিখে দিন।');
+        setAiVoiceError(errMsg);
         setTimeout(() => setAiVoiceError(null), 4000);
-      };
-
-      recognition.onend = () => {
+      },
+      onEnd: () => {
         setIsAiListening(false);
-      };
-
-      recognition.start();
-    } catch {
-      setIsAiListening(false);
-      setAiVoiceError(isEn ? 'Microphone access failed.' : 'মাইক্রোফোন চালু করা যায়নি।');
-      setTimeout(() => setAiVoiceError(null), 4000);
-    }
+      },
+    });
   };
 
   // AI Invoice Generation Handler
@@ -748,157 +742,206 @@ export const OrderFormScreen: React.FC<OrderFormScreenProps> = ({
         </div>
       </div>
 
-      {/* ✨ AI SMART INVOICE ASSISTANT (Voice & Text Autofill) */}
-      <div className="rounded-2xl border-2 border-emerald-500/80 bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-white p-4 sm:p-5 shadow-sm space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-2.5">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-700 to-teal-600 text-white shadow-xs">
-              <Sparkles className="h-5 w-5 animate-pulse" />
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black text-emerald-950">
-                  {isEn ? 'AI Smart Invoice Assistant' : '✨ শক্তিশালী AI দিয়ে নিমেষেই ইনভয়েস সাজান'}
-                </h3>
-                <span className="rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-black text-emerald-800 border border-emerald-300/60">
-                  {isEn ? 'Gemini 3.8 Flash • বাংলা ও EN' : 'Gemini AI • বাংলা ও ইংলিশ'}
+      {/* ✨ AI SMART INVOICE ASSISTANT (Voice & Text Autofill Button / Collapsible Panel) */}
+      <div className="space-y-2">
+        {!isAiManagerOpen ? (
+          <button
+            type="button"
+            onClick={() => setIsAiManagerOpen(true)}
+            className="w-full flex items-center justify-between gap-3 rounded-2xl border-2 border-dashed border-emerald-500/70 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50/50 p-3 sm:p-4 text-left transition hover:border-emerald-600 hover:shadow-md cursor-pointer group"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-700 to-teal-600 text-white shadow-xs group-hover:scale-105 transition">
+                <Sparkles className="h-5 w-5 animate-pulse" />
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs sm:text-sm font-black text-emerald-950">
+                    {isEn ? '✨ AI Smart Invoice Assistant' : '✨ AI দিয়ে ইনভয়েস সাজান (ভয়েস বা টেক্সট)'}
+                  </span>
+                  <span className="rounded-full bg-emerald-600/15 px-2 py-0.5 text-[10px] font-black text-emerald-800 border border-emerald-300">
+                    {isEn ? 'Gemini AI' : 'Gemini AI • বাংলা ও Voice'}
+                  </span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-emerald-800 font-medium truncate">
+                  {isEn
+                    ? 'Tap to speak or type prompt to auto-fill customer, items & pricing'
+                    : 'ক্লিক করে মুখে বলুন বা লিখুন — নিমেষেই স্বয়ংক্রিয়ভাবে ইনভয়েস বসে যাবে'}
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0 flex items-center gap-1.5">
+              <span className="rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-black text-white shadow-xs group-hover:bg-emerald-800 transition flex items-center gap-1.5">
+                <Wand2 className="h-3.5 w-3.5" />
+                <span>{isEn ? 'Open AI Manager' : 'AI ম্যানেজার খুলুন'}</span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </span>
+            </div>
+          </button>
+        ) : (
+          <div className="rounded-2xl border-2 border-emerald-500/80 bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-white p-4 sm:p-5 shadow-md space-y-3 animate-fadeIn">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-2.5">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-700 to-teal-600 text-white shadow-xs">
+                  <Sparkles className="h-5 w-5 animate-pulse" />
                 </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black text-emerald-950">
+                      {isEn ? 'AI Smart Invoice Assistant' : '✨ শক্তিশালী AI দিয়ে নিমেষেই ইনভয়েস সাজান'}
+                    </h3>
+                    <span className="rounded-full bg-emerald-600/10 px-2 py-0.5 text-[10px] font-black text-emerald-800 border border-emerald-300/60">
+                      {isEn ? 'Gemini AI • Voice & Text' : 'Gemini AI • ভয়েস ও টেক্সট'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 font-medium">
+                    {isEn
+                      ? 'Speak or type: e.g. "2 shirts for Jibon 8 OMR" or "জীবনের ২টি জামা ৮ OMR" — AI auto-formats customer, items, prices, and totals.'
+                      : 'মুখে বলুন বা লিখুন: যেমন « তুমি জীবনের 2টি জামা 8 omr » — নিমেষেই কাস্টমার নাম, আইটেম, দর ও হিসাব স্বয়ংক্রিয়ভাবে বসে যাবে!'}
+                  </p>
+                </div>
               </div>
-              <p className="text-[11px] text-emerald-800 font-medium">
-                {isEn
-                  ? 'Speak or type: e.g. "2 shirts for Jibon 8 OMR" or "জীবনের ২টি জামা ৮ OMR" — AI auto-formats customer, items, prices, and totals.'
-                  : 'মুখে বলুন বা লিখুন: যেমন « তুমি জীবনের 2টি জামা 8 omr » — নিমেষেই কাস্টমার নাম, আইটেম, দর ও হিসাব স্বয়ংক্রিয়ভাবে বসে যাবে!'}
+
+              <button
+                type="button"
+                onClick={() => setIsAiManagerOpen(false)}
+                className="flex items-center gap-1 rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100 shadow-2xs transition cursor-pointer"
+                title={isEn ? 'Close AI Manager' : 'AI ম্যানেজার বন্ধ করুন'}
+              >
+                <X className="h-4 w-4 text-emerald-700" />
+                <span>{isEn ? 'Hide' : 'লুকান'}</span>
+                <ChevronUp className="h-3.5 w-3.5 text-emerald-700" />
+              </button>
+            </div>
+
+            {/* Voice and Text Input Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={aiInvoicePrompt}
+                  onChange={(e) => setAiInvoicePrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleApplyAiInvoice();
+                    }
+                  }}
+                  placeholder={isEn ? 'e.g. 2 dresses for Jibon 8 omr / জীবনের ২টি জামা ৮ OMR...' : 'যেমন: তুমি জীবনের 2টি জামা 8 omr...'}
+                  className="w-full rounded-xl border border-emerald-300 bg-white px-3.5 py-2.5 pr-10 text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 shadow-2xs"
+                />
+                {aiInvoicePrompt && (
+                  <button
+                    type="button"
+                    onClick={() => setAiInvoicePrompt('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Voice Mic Button */}
+                <button
+                  type="button"
+                  onClick={handleToggleAiVoice}
+                  title={isEn ? 'Voice Input' : 'ভয়েস ইনপুট'}
+                  className={`flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer ${
+                    isAiListening
+                      ? 'bg-rose-600 text-white animate-pulse ring-4 ring-rose-200'
+                      : 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50'
+                  }`}
+                >
+                  {isAiListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4 text-emerald-700" />}
+                  <span>{isAiListening ? (isEn ? 'Listening...' : 'শুনছি...') : (isEn ? 'Voice' : 'ভয়েস')}</span>
+                </button>
+
+                {/* AI Generate Button */}
+                <button
+                  type="button"
+                  disabled={isGeneratingAiInvoice || !aiInvoicePrompt.trim()}
+                  onClick={() => handleApplyAiInvoice()}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 px-4 py-2.5 text-xs font-black text-white hover:from-emerald-800 hover:to-teal-800 active:scale-95 transition shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                  {isGeneratingAiInvoice ? (
+                    <>
+                      <Sparkles className="h-4 w-4 animate-spin text-emerald-200" />
+                      <span>{isEn ? 'Formatting...' : 'AI সাজাচ্ছে...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 text-emerald-200" />
+                      <span>{isEn ? 'Generate with AI' : 'AI দিয়ে সাজান'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Error notification if any */}
+            {aiVoiceError && (
+              <p className="text-[11px] text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 font-semibold">
+                {aiVoiceError}
               </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Voice and Text Input Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch gap-2">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              value={aiInvoicePrompt}
-              onChange={(e) => setAiInvoicePrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleApplyAiInvoice();
-                }
-              }}
-              placeholder={isEn ? 'e.g. 2 dresses for Jibon 8 omr / জীবনের ২টি জামা ৮ OMR...' : 'যেমন: তুমি জীবনের 2টি জামা 8 omr...'}
-              className="w-full rounded-xl border border-emerald-300 bg-white px-3.5 py-2.5 pr-10 text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 shadow-2xs"
-            />
-            {aiInvoicePrompt && (
-              <button
-                type="button"
-                onClick={() => setAiInvoicePrompt('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
             )}
-          </div>
 
-          <div className="flex items-center gap-2">
-            {/* Voice Mic Button */}
-            <button
-              type="button"
-              onClick={handleToggleAiVoice}
-              title={isEn ? 'Voice Input' : 'ভয়েস ইনপুট'}
-              className={`flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer ${
-                isAiListening
-                  ? 'bg-rose-600 text-white animate-pulse ring-4 ring-rose-200'
-                  : 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50'
-              }`}
-            >
-              {isAiListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4 text-emerald-700" />}
-              <span>{isAiListening ? (isEn ? 'Listening...' : 'শুনছি...') : (isEn ? 'Voice' : 'ভয়েস')}</span>
-            </button>
+            {/* Quick Clickable Suggestions */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                {isEn ? 'Quick prompts:' : 'দ্রুত ট্রাই করুন:'}
+              </span>
+              {[
+                { labelBn: '✨ জীবনের ২টি জামা ৮ OMR', labelEn: '✨ Jibon 2 Dresses 8 OMR', text: 'তুমি জীবনের 2টি জামা 8 omr' },
+                { labelBn: 'ফাতিমার ৩টি আবায়া ২৪ OMR, ১০ অগ্রিম', labelEn: 'Fatima 3 Abayas 24 OMR, 10 Adv', text: 'ফাতিমার ৩টি আবায়া ২৪ OMR, ১০ ওএমআর অগ্রিম' },
+                { labelBn: 'রাহুলের ১টি পাঞ্জাবি ৫ OMR', labelEn: 'Rahul 1 Punjabi 5 OMR', text: 'রাহুলের ১টি পাঞ্জাবি ৫ OMR' },
+              ].map((chip, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setAiInvoicePrompt(chip.text);
+                    handleApplyAiInvoice(chip.text);
+                  }}
+                  className="rounded-lg border border-emerald-200 bg-white/90 px-2.5 py-1 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100 hover:border-emerald-300 transition shadow-2xs active:scale-95 cursor-pointer"
+                >
+                  {isEn ? chip.labelEn : chip.labelBn}
+                </button>
+              ))}
+            </div>
 
-            {/* AI Generate Button */}
-            <button
-              type="button"
-              disabled={isGeneratingAiInvoice || !aiInvoicePrompt.trim()}
-              onClick={() => handleApplyAiInvoice()}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 px-4 py-2.5 text-xs font-black text-white hover:from-emerald-800 hover:to-teal-800 active:scale-95 transition shadow-sm disabled:opacity-50 cursor-pointer"
-            >
-              {isGeneratingAiInvoice ? (
-                <>
-                  <Sparkles className="h-4 w-4 animate-spin text-emerald-200" />
-                  <span>{isEn ? 'Formatting...' : 'AI সাজাচ্ছে...'}</span>
-                </>
-              ) : (
-                <>
-                  <Wand2 className="h-4 w-4 text-emerald-200" />
-                  <span>{isEn ? 'Generate with AI' : 'AI দিয়ে সাজান'}</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Error notification if any */}
-        {aiVoiceError && (
-          <p className="text-[11px] text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 font-semibold">
-            {aiVoiceError}
-          </p>
-        )}
-
-        {/* Quick Clickable Suggestions */}
-        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-            {isEn ? 'Quick prompts:' : 'দ্রুত ট্রাই করুন:'}
-          </span>
-          {[
-            { labelBn: '✨ জীবনের ২টি জামা ৮ OMR', labelEn: '✨ Jibon 2 Dresses 8 OMR', text: 'তুমি জীবনের 2টি জামা 8 omr' },
-            { labelBn: 'ফাতিমার ৩টি আবায়া ২৪ OMR, ১০ অগ্রিম', labelEn: 'Fatima 3 Abayas 24 OMR, 10 Adv', text: 'ফাতিমার ৩টি আবায়া ২৪ OMR, ১০ ওএমআর অগ্রিম' },
-            { labelBn: 'রাহুলের ১টি পাঞ্জাবি ৫ OMR', labelEn: 'Rahul 1 Punjabi 5 OMR', text: 'রাহুলের ১টি পাঞ্জাবি ৫ OMR' },
-          ].map((chip, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => {
-                setAiInvoicePrompt(chip.text);
-                handleApplyAiInvoice(chip.text);
-              }}
-              className="rounded-lg border border-emerald-200 bg-white/90 px-2.5 py-1 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100 hover:border-emerald-300 transition shadow-2xs active:scale-95 cursor-pointer"
-            >
-              {isEn ? chip.labelEn : chip.labelBn}
-            </button>
-          ))}
-        </div>
-
-        {/* Live AI Success Toast / Confirmation Card */}
-        {aiSuccessToast && (
-          <div className="rounded-xl border border-emerald-400 bg-emerald-100/70 p-3 shadow-xs animate-fadeIn space-y-1 text-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 font-black text-emerald-950">
-                <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-                <span>{isEn ? 'AI Invoice Successfully Formatted!' : '✨ AI সফলভাবে ইনভয়েস সাজিয়েছে!'}</span>
+            {/* Live AI Success Toast / Confirmation Card */}
+            {aiSuccessToast && (
+              <div className="rounded-xl border border-emerald-400 bg-emerald-100/70 p-3 shadow-xs animate-fadeIn space-y-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-black text-emerald-950">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                    <span>{isEn ? 'AI Invoice Successfully Formatted!' : '✨ AI সফলভাবে ইনভয়েস সাজিয়েছে!'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAiSuccessToast(null)}
+                    className="text-emerald-700 hover:text-emerald-950 cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <p className="text-emerald-900 font-medium">
+                  {isEn ? aiSuccessToast.summaryEn : aiSuccessToast.summaryBn}
+                </p>
+                <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] font-bold text-emerald-950">
+                  <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-200">
+                    {isEn ? 'Customer:' : 'কাস্টমার:'} {aiSuccessToast.customerName}
+                  </span>
+                  <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-200">
+                    {isEn ? 'Total Items:' : 'মোট আইটেম:'} {aiSuccessToast.itemsCount}টি
+                  </span>
+                  <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-200 text-emerald-800">
+                    {isEn ? 'Net Bill:' : 'সর্বমোট দর:'} {aiSuccessToast.currency} {aiSuccessToast.totalAmount.toFixed(2)}
+                  </span>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setAiSuccessToast(null)}
-                className="text-emerald-700 hover:text-emerald-950 cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <p className="text-emerald-900 font-medium">
-              {isEn ? aiSuccessToast.summaryEn : aiSuccessToast.summaryBn}
-            </p>
-            <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] font-bold text-emerald-950">
-              <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-200">
-                {isEn ? 'Customer:' : 'কাস্টমার:'} {aiSuccessToast.customerName}
-              </span>
-              <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-200">
-                {isEn ? 'Total Items:' : 'মোট আইটেম:'} {aiSuccessToast.itemsCount}টি
-              </span>
-              <span className="bg-white/80 px-2 py-0.5 rounded border border-emerald-200 text-emerald-800">
-                {isEn ? 'Net Bill:' : 'সর্বমোট দর:'} {aiSuccessToast.currency} {aiSuccessToast.totalAmount.toFixed(2)}
-              </span>
-            </div>
+            )}
           </div>
         )}
       </div>

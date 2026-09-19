@@ -5,7 +5,8 @@ import {
   generateBusinessInsights,
   processAiBusinessQuestion,
   generateAiBusinessReport,
-  formatBengaliNumber,
+  formatEngineMoney,
+  formatEngineCount,
   AiQueryResult,
   BusinessInsightItem,
 } from '../utils/aiBusinessEngine';
@@ -19,6 +20,7 @@ import {
   StoredAiSettings,
 } from '../utils/storage';
 import { openWhatsAppUrl } from '../utils/whatsapp';
+import { startVoiceCapture, ActiveVoiceSession } from '../utils/nativeVoiceRecognizer';
 import {
   Sparkles,
   Send,
@@ -157,75 +159,50 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
     return generateAiBusinessReport(reportPeriod, customStart, customEnd, invoices, expenses, tailorRecords, currency);
   }, [reportPeriod, customStart, customEnd, invoices, expenses, tailorRecords, currency]);
 
-  // Web Speech Recognition for Voice Input (Bengali)
+  const activeVoiceSessionRef = useRef<ActiveVoiceSession | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (activeVoiceSessionRef.current) {
+        activeVoiceSessionRef.current.stop();
+      }
+    };
+  }, []);
+
+  // Voice Input (Native APK Google Speech & Web Speech Recognition)
   const handleToggleVoice = () => {
     if (isListening) {
+      if (activeVoiceSessionRef.current) {
+        activeVoiceSessionRef.current.stop();
+        activeVoiceSessionRef.current = null;
+      }
       setIsListening(false);
       return;
     }
 
-    const SpeechRecognition =
-      (window as unknown as { SpeechRecognition?: any }).SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: any }).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setVoiceError(
-        isEn
-          ? 'Voice recognition is not supported in this browser. Please type your query.'
-          : 'আপনার ব্রাউজারে ভয়েস রিকগনিশন সাপোর্ট করে না। অনুগ্রহ করে লিখে প্রশ্ন করুন।'
-      );
-      setTimeout(() => setVoiceError(null), 4000);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = isEn ? 'en-US' : 'bn-BD';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-
-      recognition.onstart = () => {
+    setVoiceError(null);
+    activeVoiceSessionRef.current = startVoiceCapture({
+      language: isEn ? 'en-US' : 'bn-BD',
+      contextTag: 'ai_business_manager',
+      onStart: () => {
         setIsListening(true);
-        setVoiceError(null);
-      };
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript) {
+      },
+      onResult: (transcript) => {
+        setIsListening(false);
+        if (transcript && transcript.trim()) {
           setInputQuery(transcript);
           handleSendQuery(transcript);
         }
+      },
+      onError: (errText) => {
         setIsListening(false);
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error:', event.error);
+        setVoiceError(errText);
+        setTimeout(() => setVoiceError(null), 4000);
+      },
+      onEnd: () => {
         setIsListening(false);
-        if (event.error !== 'no-speech') {
-          setVoiceError(
-            isEn
-              ? 'Could not capture voice. Please check microphone permissions.'
-              : 'ভয়েস শুনতে পাওয়া যায়নি। মাইক্রোফোনের পারমিশন চেক করুন অথবা লিখে প্রশ্ন করুন।'
-          );
-          setTimeout(() => setVoiceError(null), 4000);
-        }
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognition.start();
-    } catch (err) {
-      console.error(err);
-      setIsListening(false);
-      setVoiceError(
-        isEn
-          ? 'Microphone initialization failed. Please use text input.'
-          : 'মাইক্রোফোন চালু করা যায়নি। অনুগ্রহ করে লিখে প্রশ্ন করুন।'
-      );
-      setTimeout(() => setVoiceError(null), 4000);
-    }
+      },
+    });
   };
 
   // Process user query
@@ -347,14 +324,16 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
 
   // Copy report to clipboard
   const handleCopyReport = () => {
-    navigator.clipboard.writeText(currentReport.reportTextBn);
+    const reportText = (isEn && currentReport.reportTextEn) ? currentReport.reportTextEn : currentReport.reportTextBn;
+    navigator.clipboard.writeText(reportText);
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 2500);
   };
 
   // Share report on WhatsApp
   const handleShareReportWhatsApp = () => {
-    openWhatsAppUrl(shop.phone, currentReport.reportTextBn);
+    const reportText = (isEn && currentReport.reportTextEn) ? currentReport.reportTextEn : currentReport.reportTextBn;
+    openWhatsAppUrl(shop.phone, reportText);
   };
 
   const [isDownloadingReportPdf, setIsDownloadingReportPdf] = useState(false);
@@ -439,19 +418,17 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
             <div className="px-2.5 py-1 text-center border-r border-white/10">
               <p className="text-[10px] text-emerald-200 font-bold">{isEn ? "Today's Sales" : 'আজকের বিক্রি'}</p>
               <p className="text-sm font-black text-amber-300">
-                {currency}
-                {formatBengaliNumber(overview.todaySales)}
+                {formatEngineMoney(overview.todaySales, currency, isEn)}
               </p>
             </div>
             <div className="px-2.5 py-1 text-center border-r border-white/10">
               <p className="text-[10px] text-emerald-200 font-bold">{isEn ? 'Pending' : 'পেন্ডিং'}</p>
-              <p className="text-sm font-black text-white">{formatBengaliNumber(overview.pendingOrdersCount)}</p>
+              <p className="text-sm font-black text-white">{formatEngineCount(overview.pendingOrdersCount, isEn, currency)}</p>
             </div>
             <div className="px-2.5 py-1 text-center">
               <p className="text-[10px] text-emerald-200 font-bold">{isEn ? 'Customer Due' : 'বকেয়া পাওনা'}</p>
               <p className="text-sm font-black text-rose-300">
-                {currency}
-                {formatBengaliNumber(overview.totalCustomerDue)}
+                {formatEngineMoney(overview.totalCustomerDue, currency, isEn)}
               </p>
             </div>
           </div>
@@ -605,7 +582,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
                               </div>
                             </div>
                             <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-200/80 text-emerald-900">
-                              {payload.customerData.totalOrders} {isEn ? 'Orders' : 'অর্ডার'}
+                              {formatEngineCount(payload.customerData.totalOrders, isEn, currency)} {isEn ? 'Orders' : 'অর্ডার'}
                             </span>
                           </div>
 
@@ -613,15 +590,13 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
                             <div className="bg-white/80 p-2 rounded-xl border border-emerald-100">
                               <span className="text-slate-500 block">{isEn ? 'Total Billed' : 'মোট বিল'}</span>
                               <span className="font-black text-slate-900">
-                                {currency}
-                                {formatBengaliNumber(payload.customerData.totalAmount)}
+                                {formatEngineMoney(payload.customerData.totalAmount, currency, isEn)}
                               </span>
                             </div>
                             <div className="bg-white/80 p-2 rounded-xl border border-emerald-100">
                               <span className="text-slate-500 block">{isEn ? 'Current Due' : 'বকেয়া বাকি'}</span>
                               <span className={`font-black ${payload.customerData.dueAmount > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                                {currency}
-                                {formatBengaliNumber(payload.customerData.dueAmount)}
+                                {formatEngineMoney(payload.customerData.dueAmount, currency, isEn)}
                               </span>
                             </div>
                           </div>
@@ -744,15 +719,15 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
                                 </div>
                                 <div className="text-right flex items-center gap-2">
                                   <span className="font-black text-rose-600 text-xs">
-                                    {currency}
-                                    {formatBengaliNumber(due.dueAmount)}
+                                    {formatEngineMoney(due.dueAmount, currency, isEn)}
                                   </span>
                                   {due.customerPhone && (
                                     <button
                                       onClick={() => {
+                                        const dueStr = formatEngineMoney(due.dueAmount, currency, isEn);
                                         const reminder = isEn
-                                          ? `Dear ${due.customerName}, gentle reminder regarding outstanding due of ${currency}${due.dueAmount} for invoice #${due.invoiceId} at ${shop.name}.`
-                                          : `আসসালামু আলাইকুম ${due.customerName}, ${shop.name} থেকে জানানো হচ্ছে যে ইনভয়েস #${due.invoiceId}-এর ${currency}${due.dueAmount} বকেয়া রয়েছে। অনুগ্রহ করে সুবিধামতো পরিশোধের অনুরোধ রইল।`;
+                                          ? `Dear ${due.customerName}, gentle reminder regarding outstanding due of ${dueStr} for invoice #${due.invoiceId} at ${shop.name}.`
+                                          : `আসসালামু আলাইকুম ${due.customerName}, ${shop.name} থেকে জানানো হচ্ছে যে ইনভয়েস #${due.invoiceId}-এর ${dueStr} বকেয়া রয়েছে। অনুগ্রহ করে সুবিধামতো পরিশোধের অনুরোধ রইল।`;
                                         openWhatsAppUrl(due.customerPhone, reminder);
                                       }}
                                       className="p-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition"
@@ -1042,8 +1017,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-xs">
                 <span className="text-xs font-bold text-emerald-800 block">{isEn ? "Today's Sales" : 'আজকের বিক্রি'}</span>
                 <p className="text-xl sm:text-2xl font-black text-emerald-950 mt-1">
-                  {currency}
-                  {formatBengaliNumber(overview.todaySales)}
+                  {formatEngineMoney(overview.todaySales, currency, isEn)}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1">
                   {isEn ? 'New orders placed today' : 'আজ গৃহীত নতুন অর্ডার'}
@@ -1054,8 +1028,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 shadow-xs">
                 <span className="text-xs font-bold text-rose-800 block">{isEn ? "Today's Expenses" : 'আজকের খরচ'}</span>
                 <p className="text-xl sm:text-2xl font-black text-rose-950 mt-1">
-                  {currency}
-                  {formatBengaliNumber(overview.todayExpenses)}
+                  {formatEngineMoney(overview.todayExpenses, currency, isEn)}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1">
                   {isEn ? 'Shop operational expenses' : 'দোকানের বিবিধ খরচ'}
@@ -1066,8 +1039,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-white p-4 shadow-xs">
                 <span className="text-xs font-bold text-teal-800 block">{isEn ? "Today's Profit" : 'আজকের লাভ'}</span>
                 <p className="text-xl sm:text-2xl font-black text-teal-950 mt-1">
-                  {currency}
-                  {formatBengaliNumber(overview.todayProfit)}
+                  {formatEngineMoney(overview.todayProfit, currency, isEn)}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1">
                   {isEn ? 'Sales minus expenses' : 'বিক্রি থেকে খরচ বাদ'}
@@ -1078,8 +1050,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-xs">
                 <span className="text-xs font-bold text-amber-800 block">{isEn ? 'Cash Balance' : 'ক্যাশ ব্যালেন্স'}</span>
                 <p className="text-xl sm:text-2xl font-black text-amber-950 mt-1">
-                  {currency}
-                  {formatBengaliNumber(overview.cashBalance)}
+                  {formatEngineMoney(overview.cashBalance, currency, isEn)}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1">
                   {isEn ? 'Estimated register balance' : 'হাতে থাকা নিট ক্যাশ'}
@@ -1099,7 +1070,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
                 <span className="text-xs font-bold text-slate-600 block">{isEn ? 'Total Customers' : 'মোট কাস্টমার'}</span>
                 <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
-                  {formatBengaliNumber(overview.totalCustomersCount)} {isEn ? 'persons' : 'জন'}
+                  {formatEngineCount(overview.totalCustomersCount, isEn, currency)} {isEn ? 'persons' : 'জন'}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">{isEn ? 'Unique recorded clients' : 'অনন্য নিবন্ধিত গ্রাহক'}</p>
               </div>
@@ -1107,7 +1078,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 shadow-xs">
                 <span className="text-xs font-bold text-amber-800 block">{isEn ? 'Pending Orders' : 'পেন্ডিং অর্ডার'}</span>
                 <p className="text-xl sm:text-2xl font-black text-amber-950 mt-1">
-                  {formatBengaliNumber(overview.pendingOrdersCount)} {isEn ? 'orders' : 'টি'}
+                  {formatEngineCount(overview.pendingOrdersCount, isEn, currency)} {isEn ? 'orders' : 'টি'}
                 </p>
                 <p className="text-[11px] text-amber-700/80 mt-1">{isEn ? 'Awaiting start or fabric' : 'কাজ শুরু করার অপেক্ষায়'}</p>
               </div>
@@ -1115,7 +1086,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 shadow-xs">
                 <span className="text-xs font-bold text-blue-800 block">{isEn ? 'Ready for Pickup' : 'রেডি অর্ডার'}</span>
                 <p className="text-xl sm:text-2xl font-black text-blue-950 mt-1">
-                  {formatBengaliNumber(overview.readyOrdersCount)} {isEn ? 'orders' : 'টি'}
+                  {formatEngineCount(overview.readyOrdersCount, isEn, currency)} {isEn ? 'orders' : 'টি'}
                 </p>
                 <p className="text-[11px] text-blue-700/80 mt-1">{isEn ? 'Tailored & waiting' : 'সেলাই সম্পন্ন, ডেলিভারি রেডি'}</p>
               </div>
@@ -1123,7 +1094,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-xs">
                 <span className="text-xs font-bold text-emerald-800 block">{isEn ? 'Delivered Orders' : 'ডেলিভার্ড অর্ডার'}</span>
                 <p className="text-xl sm:text-2xl font-black text-emerald-950 mt-1">
-                  {formatBengaliNumber(overview.deliveredOrdersCount)} {isEn ? 'orders' : 'টি'}
+                  {formatEngineCount(overview.deliveredOrdersCount, isEn, currency)} {isEn ? 'orders' : 'টি'}
                 </p>
                 <p className="text-[11px] text-emerald-700/80 mt-1">{isEn ? 'Completed deliveries' : 'সফলভাবে বুঝিয়ে দেওয়া'}</p>
               </div>
@@ -1138,8 +1109,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
                   {isEn ? 'Total Customer Due' : 'মোট কাস্টমার বাকি (বকেয়া)'}
                 </span>
                 <p className="text-2xl sm:text-3xl font-black text-rose-600 mt-1">
-                  {currency}
-                  {formatBengaliNumber(overview.totalCustomerDue)}
+                  {formatEngineMoney(overview.totalCustomerDue, currency, isEn)}
                 </p>
                 <p className="text-xs text-rose-800/80 mt-1">
                   {isEn ? 'Uncollected money across invoices' : 'কাস্টমারদের কাছে মোট পাওনা টাকা'}
@@ -1156,8 +1126,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
                   {isEn ? 'Karigar Due Balance' : 'কারিগরদের বকেয়া মজুরি'}
                 </span>
                 <p className="text-2xl sm:text-3xl font-black text-amber-600 mt-1">
-                  {currency}
-                  {formatBengaliNumber(overview.totalKarigarDue)}
+                  {formatEngineMoney(overview.totalKarigarDue, currency, isEn)}
                 </p>
                 <p className="text-xs text-amber-800/80 mt-1">
                   {isEn ? 'Outstanding wage payments to tailors' : 'কারিগরদের পরিশোধযোগ্য মজুরি বাকি'}
@@ -1180,17 +1149,15 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                 <span className="text-xs text-slate-500 font-bold block">{isEn ? 'Monthly Sales' : 'চলতি মাসের বিক্রি'}</span>
                 <p className="text-xl font-black text-slate-900 mt-1">
-                  {currency}
-                  {formatBengaliNumber(overview.monthlySales)}
+                  {formatEngineMoney(overview.monthlySales, currency, isEn)}
                 </p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{formatBengaliNumber(overview.monthlyOrdersCount)} {isEn ? 'orders' : 'টি অর্ডার'}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{formatEngineCount(overview.monthlyOrdersCount, isEn, currency)} {isEn ? 'orders' : 'টি অর্ডার'}</p>
               </div>
 
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                 <span className="text-xs text-slate-500 font-bold block">{isEn ? 'Monthly Expenses' : 'চলতি মাসের খরচ'}</span>
                 <p className="text-xl font-black text-slate-900 mt-1">
-                  {currency}
-                  {formatBengaliNumber(overview.monthlyExpenses)}
+                  {formatEngineMoney(overview.monthlyExpenses, currency, isEn)}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">{isEn ? 'Shop & tailoring costs' : 'দোকানের মাসিক মোট ব্যয়'}</p>
               </div>
@@ -1198,8 +1165,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
                 <span className="text-xs text-slate-500 font-bold block">{isEn ? 'Monthly Profit' : 'চলতি মাসের লাভ'}</span>
                 <p className="text-xl font-black text-emerald-700 mt-1">
-                  {currency}
-                  {formatBengaliNumber(overview.monthlyProfit)}
+                  {formatEngineMoney(overview.monthlyProfit, currency, isEn)}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">{isEn ? 'Net profit before taxes' : 'আনুমানিক নিট প্রফিট'}</p>
               </div>
@@ -1267,7 +1233,7 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
                         </div>
                         {item.metricValue && (
                           <span className="text-xs font-black px-2 py-0.5 rounded-md bg-white border border-slate-200 shadow-2xs">
-                            {item.metricValue}
+                            {isEn && item.metricValueEn ? item.metricValueEn : item.metricValue}
                           </span>
                         )}
                       </div>
@@ -1473,24 +1439,21 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
               <div className="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-200">
                 <span className="text-[11px] font-bold text-emerald-800">{isEn ? 'Total Sales' : 'মোট বিক্রি'}</span>
                 <p className="text-lg sm:text-xl font-black text-emerald-950 mt-0.5">
-                  {currency}
-                  {formatBengaliNumber(currentReport.totalSales)}
+                  {formatEngineMoney(currentReport.totalSales, currency, isEn)}
                 </p>
               </div>
 
               <div className="bg-rose-50/80 p-3 rounded-2xl border border-rose-200">
                 <span className="text-[11px] font-bold text-rose-800">{isEn ? 'Total Expenses' : 'মোট খরচ'}</span>
                 <p className="text-lg sm:text-xl font-black text-rose-950 mt-0.5">
-                  {currency}
-                  {formatBengaliNumber(currentReport.totalExpenseAmount)}
+                  {formatEngineMoney(currentReport.totalExpenseAmount, currency, isEn)}
                 </p>
               </div>
 
               <div className="bg-teal-50/80 p-3 rounded-2xl border border-teal-200 col-span-2 sm:col-span-1">
                 <span className="text-[11px] font-bold text-teal-800">{isEn ? 'Estimated Net Profit' : 'আনুমানিক নিট লাভ'}</span>
                 <p className="text-lg sm:text-xl font-black text-teal-950 mt-0.5">
-                  {currency}
-                  {formatBengaliNumber(currentReport.estimatedNetProfit)}
+                  {formatEngineMoney(currentReport.estimatedNetProfit, currency, isEn)}
                 </p>
               </div>
             </div>
@@ -1506,24 +1469,24 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
                 <div className="space-y-1.5 text-slate-700">
                   <div className="flex justify-between">
                     <span>{isEn ? 'Total Orders Placed:' : 'মোট নতুন অর্ডার:'}</span>
-                    <span className="font-bold">{formatBengaliNumber(currentReport.totalOrdersCount)} {isEn ? 'orders' : 'টি'}</span>
+                    <span className="font-bold">{formatEngineCount(currentReport.totalOrdersCount, isEn, currency)} {isEn ? 'orders' : 'টি'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>{isEn ? 'Unique Customers:' : 'অর্ডারিং কাস্টমার:'}</span>
-                    <span className="font-bold">{formatBengaliNumber(currentReport.uniqueCustomersCount)} {isEn ? 'persons' : 'জন'}</span>
+                    <span className="font-bold">{formatEngineCount(currentReport.uniqueCustomersCount, isEn, currency)} {isEn ? 'persons' : 'জন'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>{isEn ? 'Delivered Orders:' : 'ডেলিভারি সম্পন্ন:'}</span>
-                    <span className="font-bold text-emerald-700">{formatBengaliNumber(currentReport.deliveredOrders)} {isEn ? 'orders' : 'টি'}</span>
+                    <span className="font-bold text-emerald-700">{formatEngineCount(currentReport.deliveredOrders, isEn, currency)} {isEn ? 'orders' : 'টি'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>{isEn ? 'Ready for Pickup:' : 'রেডি (দোকানে প্রস্তুত):'}</span>
-                    <span className="font-bold text-blue-700">{formatBengaliNumber(currentReport.readyOrders)} {isEn ? 'orders' : 'টি'}</span>
+                    <span className="font-bold text-blue-700">{formatEngineCount(currentReport.readyOrders, isEn, currency)} {isEn ? 'orders' : 'টি'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>{isEn ? 'Pending / In Progress:' : 'পেন্ডিং / চলমান:'}</span>
                     <span className="font-bold text-amber-700">
-                      {formatBengaliNumber(currentReport.pendingOrders + currentReport.inProgressOrders)} {isEn ? 'orders' : 'টি'}
+                      {formatEngineCount(currentReport.pendingOrders + currentReport.inProgressOrders, isEn, currency)} {isEn ? 'orders' : 'টি'}
                     </span>
                   </div>
                 </div>
@@ -1539,36 +1502,31 @@ export const AiBusinessManagerScreen: React.FC<AiBusinessManagerScreenProps> = (
                   <div className="flex justify-between">
                     <span>{isEn ? 'Period Customer Due:' : 'কাস্টমার বকেয়া পাওনা:'}</span>
                     <span className="font-bold text-rose-600">
-                      {currency}
-                      {formatBengaliNumber(currentReport.totalDue)}
+                      {formatEngineMoney(currentReport.totalDue, currency, isEn)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>{isEn ? 'Advance Collected:' : 'অগ্রিম আদায়:'}</span>
                     <span className="font-bold">
-                      {currency}
-                      {formatBengaliNumber(currentReport.totalAdvance)}
+                      {formatEngineMoney(currentReport.totalAdvance, currency, isEn)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>{isEn ? 'Karigar Wages Earned:' : 'কারিগরদের কাজের মজুরি:'}</span>
                     <span className="font-bold">
-                      {currency}
-                      {formatBengaliNumber(currentReport.totalKarigarWages)}
+                      {formatEngineMoney(currentReport.totalKarigarWages, currency, isEn)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>{isEn ? 'Karigar Wages Paid:' : 'পরিশোধিত মজুরি:'}</span>
                     <span className="font-bold text-emerald-700">
-                      {currency}
-                      {formatBengaliNumber(currentReport.totalKarigarPaid)}
+                      {formatEngineMoney(currentReport.totalKarigarPaid, currency, isEn)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>{isEn ? 'Karigar Payable Balance:' : 'কারিগরদের বকেয়া মজুরি:'}</span>
                     <span className="font-bold text-amber-600">
-                      {currency}
-                      {formatBengaliNumber(currentReport.totalKarigarDue)}
+                      {formatEngineMoney(currentReport.totalKarigarDue, currency, isEn)}
                     </span>
                   </div>
                 </div>

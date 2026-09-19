@@ -34,7 +34,9 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.PermissionRequest;
 import android.widget.Toast;
+import android.speech.RecognizerIntent;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -48,8 +50,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -59,6 +64,9 @@ public class MainActivity extends AppCompatActivity {
     private String mCameraPhotoPath;
     private static final int INPUT_FILE_REQUEST_CODE = 1001;
     private static final int PERMISSION_REQUEST_CODE = 1002;
+    private static final int SPEECH_REQUEST_CODE = 1003;
+    private static final int AUDIO_PERMISSION_REQUEST_CODE = 1004;
+    private String mCurrentSpeechContext = "default";
 
     // Secure virtual HTTPS domain provided by AndroidX WebViewAssetLoader for 100% offline ES-module & CORS compliance
     private static final String APP_ASSET_URL = "https://appassets.androidplatform.net/assets/web/index.html";
@@ -198,6 +206,23 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
 
+            // Microphone and media permission request handling for HTML5
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (request != null) {
+                                request.grant(request.getResources());
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "PermissionRequest grant error", e);
+                        }
+                    }
+                });
+            }
+
             // Camera, Gallery, and File Chooser (Smart handling for Backup & Images)
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
@@ -291,19 +316,41 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestAppPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, new String[]{
-                        Manifest.permission.CAMERA,
-                        Manifest.permission.READ_EXTERNAL_STORAGE,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE
-                }, PERMISSION_REQUEST_CODE);
+            String[] permissions = new String[]{
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.RECORD_AUDIO,
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+            };
+            boolean needRequest = false;
+            for (String perm : permissions) {
+                if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+                    needRequest = true;
+                    break;
+                }
+            }
+            if (needRequest) {
+                ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
             }
         }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == INPUT_FILE_REQUEST_CODE) {
+        if (requestCode == SPEECH_REQUEST_CODE) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                ArrayList<String> matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                if (matches != null && !matches.isEmpty()) {
+                    String recognizedText = matches.get(0);
+                    sendSpeechResultToWeb(recognizedText, mCurrentSpeechContext);
+                } else {
+                    sendSpeechErrorToWeb("কোনো কথা বোঝা যায়নি", mCurrentSpeechContext);
+                }
+            } else {
+                sendSpeechErrorToWeb("ভয়েস বাতিল করা হয়েছে", mCurrentSpeechContext);
+            }
+            return;
+        } else if (requestCode == INPUT_FILE_REQUEST_CODE) {
             if (mFilePathCallback == null) {
                 super.onActivityResult(requestCode, resultCode, data);
                 return;
@@ -326,6 +373,58 @@ public class MainActivity extends AppCompatActivity {
         } else {
             super.onActivityResult(requestCode, resultCode, data);
         }
+    }
+
+    public void sendSpeechResultToWeb(final String text, final String contextTag) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (webView == null) return;
+                try {
+                    String escapedText = JSONObject.quote(text != null ? text : "");
+                    String escapedContext = JSONObject.quote(contextTag != null ? contextTag : "default");
+                    String js = "(function() {" +
+                            "  if (typeof window.__onNativeVoiceResult === 'function') {" +
+                            "    try { window.__onNativeVoiceResult(" + escapedText + ", " + escapedContext + "); } catch(e){ console.error(e); }" +
+                            "  }" +
+                            "  try { window.dispatchEvent(new CustomEvent('nativeVoiceResult', { detail: { text: " + escapedText + ", context: " + escapedContext + " } })); } catch(e){ console.error(e); }" +
+                            "})();";
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        webView.evaluateJavascript(js, null);
+                    } else {
+                        webView.loadUrl("javascript:" + js);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "sendSpeechResultToWeb error", e);
+                }
+            }
+        });
+    }
+
+    public void sendSpeechErrorToWeb(final String errorMsg, final String contextTag) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (webView == null) return;
+                try {
+                    String escapedErr = JSONObject.quote(errorMsg != null ? errorMsg : "ভয়েস প্রসেস করা যায়নি");
+                    String escapedContext = JSONObject.quote(contextTag != null ? contextTag : "default");
+                    String js = "(function() {" +
+                            "  if (typeof window.__onNativeVoiceError === 'function') {" +
+                            "    try { window.__onNativeVoiceError(" + escapedErr + ", " + escapedContext + "); } catch(e){ console.error(e); }" +
+                            "  }" +
+                            "  try { window.dispatchEvent(new CustomEvent('nativeVoiceError', { detail: { error: " + escapedErr + ", context: " + escapedContext + " } })); } catch(e){ console.error(e); }" +
+                            "})();";
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        webView.evaluateJavascript(js, null);
+                    } else {
+                        webView.loadUrl("javascript:" + js);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "sendSpeechErrorToWeb error", e);
+                }
+            }
+        });
     }
 
     @Override
@@ -887,6 +986,57 @@ public class MainActivity extends AppCompatActivity {
                 showToast("ব্যাকআপ ফাইলে সমস্যা: " + e.getMessage());
                 return false;
             }
+        }
+
+        /**
+         * 12. Voice Recognition Engine
+         * Uses Android native RecognizerIntent with Bengali (bn-BD) and English support.
+         */
+        @JavascriptInterface
+        public boolean isVoiceRecognitionSupported() {
+            return true;
+        }
+
+        @JavascriptInterface
+        public void startVoiceRecognition(final String language, final String contextTag) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        mCurrentSpeechContext = (contextTag != null && !contextTag.trim().isEmpty())
+                                ? contextTag.trim()
+                                : "default";
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                                    != PackageManager.PERMISSION_GRANTED) {
+                                ActivityCompat.requestPermissions(MainActivity.this,
+                                        new String[]{Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION_REQUEST_CODE);
+                            }
+                        }
+
+                        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                        String lang = (language != null && !language.trim().isEmpty()) ? language.trim() : "bn-BD";
+                        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang);
+                        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang);
+                        intent.putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, false);
+                        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "মুখে বলুন (যেমন: জীবনের ২টি জামা ৮ OMR)...");
+                        startActivityForResult(intent, SPEECH_REQUEST_CODE);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to start speech recognition intent", e);
+                        try {
+                            Intent fallback = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                            fallback.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                            fallback.putExtra(RecognizerIntent.EXTRA_PROMPT, "মুখে বলুন...");
+                            startActivityForResult(fallback, SPEECH_REQUEST_CODE);
+                        } catch (Exception ex2) {
+                            showToast("ভয়েস সার্ভিস পাওয়া যায়নি। Google Voice Search সক্রিয় আছে কিনা দেখুন।");
+                            sendSpeechErrorToWeb("Speech service not found", mCurrentSpeechContext);
+                        }
+                    }
+                }
+            });
         }
 
         private byte[] decodeBase64(String input) {

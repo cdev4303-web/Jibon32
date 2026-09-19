@@ -34,6 +34,7 @@ export interface BusinessInsightItem {
   descriptionEn: string;
   severity: 'info' | 'warning' | 'success' | 'alert';
   metricValue?: string;
+  metricValueEn?: string;
   actionType?: 'due' | 'pending-orders' | 'ready-orders' | 'customer' | 'karigar' | 'expense';
 }
 
@@ -136,6 +137,25 @@ export const formatBengaliNumber = (num: number): string => {
     ',': ',',
   };
   return enDigits.replace(/[0-9,]/g, (char) => enToBnMap[char] || char);
+};
+
+// Smart money formatter that prevents English currency letters (like OMR, USD, AED)
+// from ever colliding directly with Bengali numbers (e.g. OMR 30 instead of OMR৩০)
+export const formatEngineMoney = (amount: number, currency: string, forceEnglish = false): string => {
+  const cleanCurr = (currency || '').trim();
+  const isEnglishCurrency = /^[A-Za-z$€£¥]+$/.test(cleanCurr);
+  if (forceEnglish || isEnglishCurrency) {
+    return `${cleanCurr} ${Math.round(amount).toLocaleString('en-US')}`;
+  }
+  return `${cleanCurr} ${formatBengaliNumber(amount)}`;
+};
+
+export const formatEngineCount = (count: number, forceEnglish = false, currency?: string): string => {
+  const isEnglishCurrency = Boolean(currency && /^[A-Za-z$€£¥]+$/.test(currency.trim()));
+  if (forceEnglish || isEnglishCurrency) {
+    return Math.round(count).toLocaleString('en-US');
+  }
+  return formatBengaliNumber(count);
 };
 
 // Calculate all business overview metrics directly from actual application data
@@ -294,7 +314,8 @@ export const generateBusinessInsights = (
         titleEn: 'Sales Growth',
         descriptionBn: `এই মাসে আপনার বিক্রি গত মাসের তুলনায় ${formatBengaliNumber(overview.salesGrowthPercent)}% বেশি। (গত মাস: ${currency}${formatBengaliNumber(overview.lastMonthSales)}, এই মাস: ${currency}${formatBengaliNumber(overview.monthlySales)})`,
         descriptionEn: `This month your sales grew by ${overview.salesGrowthPercent}% compared to last month. (Last month: ${currency}${overview.lastMonthSales.toLocaleString()}, This month: ${currency}${overview.monthlySales.toLocaleString()})`,
-        metricValue: `+${overview.salesGrowthPercent}%`,
+        metricValue: `+${formatBengaliNumber(overview.salesGrowthPercent)}%`,
+        metricValueEn: `+${overview.salesGrowthPercent}%`,
       });
     } else {
       insights.push({
@@ -305,7 +326,8 @@ export const generateBusinessInsights = (
         titleEn: 'Sales Trend',
         descriptionBn: `এই মাসে আপনার বিক্রি গত মাসের চেয়ে ${formatBengaliNumber(Math.abs(overview.salesGrowthPercent))}% কম। বেশি অর্ডার পেতে কাস্টমারদের সাথে যোগাযোগ করুন।`,
         descriptionEn: `This month sales are ${Math.abs(overview.salesGrowthPercent)}% lower than last month. Consider following up with regular customers.`,
-        metricValue: `${overview.salesGrowthPercent}%`,
+        metricValue: `${formatBengaliNumber(overview.salesGrowthPercent)}%`,
+        metricValueEn: `${overview.salesGrowthPercent}%`,
       });
     }
   } else if (overview.monthlySales > 0) {
@@ -317,7 +339,8 @@ export const generateBusinessInsights = (
       titleEn: 'Current Month Sales',
       descriptionBn: `এই মাসে এখন পর্যন্ত মোট ${formatBengaliNumber(overview.monthlyOrdersCount)}টি অর্ডারে ${currency}${formatBengaliNumber(overview.monthlySales)} বিক্রি হয়েছে।`,
       descriptionEn: `Total sales of ${currency}${overview.monthlySales.toLocaleString()} recorded across ${overview.monthlyOrdersCount} orders this month.`,
-      metricValue: `${currency}${overview.monthlySales.toLocaleString()}`,
+      metricValue: `${currency} ${formatBengaliNumber(overview.monthlySales)}`,
+      metricValueEn: `${currency} ${overview.monthlySales.toLocaleString()}`,
     });
   }
 
@@ -333,7 +356,8 @@ export const generateBusinessInsights = (
       titleEn: 'Customer Outstanding Due',
       descriptionBn: `${formatBengaliNumber(dueCustomersSet.size)} জন কাস্টমারের কাছে মোট ${currency}${formatBengaliNumber(overview.totalCustomerDue)} টাকা বাকি আছে। সময়মতো আদায়ের জন্য WhatsApp এ তাগাদা পাঠান।`,
       descriptionEn: `${dueCustomersSet.size} customers have total outstanding due of ${currency}${overview.totalCustomerDue.toLocaleString()}. Use WhatsApp reminders for collection.`,
-      metricValue: `${currency}${overview.totalCustomerDue.toLocaleString()}`,
+      metricValue: `${currency} ${formatBengaliNumber(overview.totalCustomerDue)}`,
+      metricValueEn: `${currency} ${overview.totalCustomerDue.toLocaleString()}`,
       actionType: 'due',
     });
   }
@@ -351,7 +375,8 @@ export const generateBusinessInsights = (
       titleEn: 'Overdue Delivery Alert',
       descriptionBn: `${formatBengaliNumber(overdueOrders.length)}টি অর্ডারের Delivery Date পার হয়ে গেছে কিন্তু এখনো ডেলিভারি সম্পন্ন হয়নি। দ্রুত কাজ শেষ করে কাস্টমারকে জানান।`,
       descriptionEn: `${overdueOrders.length} orders have passed their delivery date. Prioritize completing and delivering them.`,
-      metricValue: `${overdueOrders.length}টি`,
+      metricValue: `${formatBengaliNumber(overdueOrders.length)}টি`,
+      metricValueEn: `${overdueOrders.length} orders`,
       actionType: 'pending-orders',
     });
   }
@@ -367,7 +392,8 @@ export const generateBusinessInsights = (
       titleEn: 'Ready Orders for Pickup',
       descriptionBn: `${formatBengaliNumber(readyOrders.length)}টি পোশাক সম্পূর্ণ সেলাই সম্পন্ন ও দোকানে রেডি রয়েছে। কাস্টমারদের "কাপড় রেডি" WhatsApp মেসেজ পাঠান।`,
       descriptionEn: `${readyOrders.length} orders are ready for pickup in the shop. Send ready notifications to customers.`,
-      metricValue: `${readyOrders.length}টি`,
+      metricValue: `${formatBengaliNumber(readyOrders.length)}টি`,
+      metricValueEn: `${readyOrders.length} orders`,
       actionType: 'ready-orders',
     });
   }
@@ -403,7 +429,8 @@ export const generateBusinessInsights = (
       titleEn: 'Top Returning Customer',
       descriptionBn: `কাস্টমার "${topCustomer.name}" এ পর্যন্ত সর্বোচ্চ ${formatBengaliNumber(topCustomer.count)}টি অর্ডার করেছেন (মোট কেনাকাটা ${currency}${formatBengaliNumber(topCustomer.totalSpent)})। এই কাস্টমারদের বিশেষ যত্ন দিন।`,
       descriptionEn: `Customer "${topCustomer.name}" has placed ${topCustomer.count} orders (${currency}${topCustomer.totalSpent.toLocaleString()} total). Reward loyal customers.`,
-      metricValue: `${topCustomer.count}টি অর্ডার`,
+      metricValue: `${formatBengaliNumber(topCustomer.count)}টি অর্ডার`,
+      metricValueEn: `${topCustomer.count} orders`,
       actionType: 'customer',
     });
   }
@@ -426,7 +453,8 @@ export const generateBusinessInsights = (
       titleEn: 'Best-Selling Dress Type',
       descriptionBn: `আপনার দোকানে সবচেয়ে বেশি বিক্রিত আইটেম হলো "${topDress}", মোট ${formatBengaliNumber(count)}টি অর্ডারে এই পোশাক সেলাই হয়েছে।`,
       descriptionEn: `Your most requested dress type is "${topDress}" with ${count} orders.`,
-      metricValue: `${count}টি`,
+      metricValue: `${formatBengaliNumber(count)}টি`,
+      metricValueEn: `${count} items`,
     });
   }
 
@@ -449,7 +477,8 @@ export const generateBusinessInsights = (
       titleEn: 'Highest Expense Category',
       descriptionBn: `দোকানের ব্যয়ের মধ্যে সবচেয়ে বেশি খরচ হয়েছে "${topCategory}" খাতে (${currency}${formatBengaliNumber(amount)})। খরচের বাজেট নিয়ন্ত্রণে রাখুন।`,
       descriptionEn: `Largest expense is in "${topCategory}" category (${currency}${amount.toLocaleString()}). Monitor cost efficiency.`,
-      metricValue: `${currency}${amount.toLocaleString()}`,
+      metricValue: `${currency} ${formatBengaliNumber(amount)}`,
+      metricValueEn: `${currency} ${amount.toLocaleString()}`,
       actionType: 'expense',
     });
   }
@@ -464,7 +493,8 @@ export const generateBusinessInsights = (
       titleEn: 'Karigar Outstanding Wages',
       descriptionBn: `কারিগরদের মোট পাওনা মজুরি ${currency}${formatBengaliNumber(overview.totalKarigarDue)}। যথাসময়ে কারিগরদের মজুরি পরিশোধ কাজের গতি বজায় রাখতে সাহায্য করে।`,
       descriptionEn: `Total karigar payable wage balance is ${currency}${overview.totalKarigarDue.toLocaleString()}. Ensure timely settlements.`,
-      metricValue: `${currency}${overview.totalKarigarDue.toLocaleString()}`,
+      metricValue: `${currency} ${formatBengaliNumber(overview.totalKarigarDue)}`,
+      metricValueEn: `${currency} ${overview.totalKarigarDue.toLocaleString()}`,
       actionType: 'karigar',
     });
   }
@@ -520,8 +550,8 @@ export const processAiBusinessQuestion = (
     const todayInvoices = invoices.filter((i) => i.orderDate === todayStr);
     const count = todayInvoices.length;
     return {
-      answerBn: `আজকের মোট বিক্রি ${currency}${formatBengaliNumber(overview.todaySales)} (মোট ${formatBengaliNumber(count)}টি নতুন অর্ডার)।\nআজ সরাসরি অগ্রিম জমা হয়েছে ${currency}${formatBengaliNumber(overview.todayAdvance)} এবং পুরাতন বকেয়া আদায় হয়েছে ${currency}${formatBengaliNumber(overview.todayDueCollected)}।`,
-      answerEn: `Today's total sales: ${currency}${overview.todaySales.toLocaleString()} (${count} new orders).\nAdvance collected: ${currency}${overview.todayAdvance.toLocaleString()}, Due collected: ${currency}${overview.todayDueCollected.toLocaleString()}.`,
+      answerBn: `আজকের মোট বিক্রি ${formatEngineMoney(overview.todaySales, currency)} (মোট ${formatEngineCount(count, false, currency)}টি নতুন অর্ডার)।\nআজ সরাসরি অগ্রিম জমা হয়েছে ${formatEngineMoney(overview.todayAdvance, currency)} এবং পুরাতন বকেয়া আদায় হয়েছে ${formatEngineMoney(overview.todayDueCollected, currency)}।`,
+      answerEn: `Today's total sales: ${formatEngineMoney(overview.todaySales, currency, true)} (${count} new orders).\nAdvance collected: ${formatEngineMoney(overview.todayAdvance, currency, true)}, Due collected: ${formatEngineMoney(overview.todayDueCollected, currency, true)}.`,
       ordersList: todayInvoices.map((inv) => ({
         id: inv.id,
         customerName: inv.customerName,
@@ -544,14 +574,15 @@ export const processAiBusinessQuestion = (
     const todayExpensesList = expenses.filter((e) => e.date === todayStr && (e.type === 'Expense' || !e.type));
     if (overview.todayExpenses === 0) {
       return {
-        answerBn: `আজ এখনো পর্যন্ত কোনো দোকান খরচ এন্ট্রি করা হয়নি (মোট খরচ: ${currency}০)।`,
-        answerEn: `No expenses recorded for today so far (Total: ${currency}0).`,
+        answerBn: `আজ এখনো পর্যন্ত কোনো দোকান খরচ এন্ট্রি করা হয়নি (মোট খরচ: ${formatEngineMoney(0, currency)})।`,
+        answerEn: `No expenses recorded for today so far (Total: ${formatEngineMoney(0, currency, true)}).`,
       };
     }
-    const breakdown = todayExpensesList.map((e) => `${e.category}: ${currency}${formatBengaliNumber(e.amount)} (${e.description || 'বিবরণ নেই'})`).join('\n• ');
+    const breakdownBn = todayExpensesList.map((e) => `${e.category}: ${formatEngineMoney(e.amount, currency)} (${e.description || 'বিবরণ নেই'})`).join('\n• ');
+    const breakdownEn = todayExpensesList.map((e) => `${e.category}: ${formatEngineMoney(e.amount, currency, true)} (${e.description || 'No description'})`).join('\n• ');
     return {
-      answerBn: `আজকের মোট খরচ ${currency}${formatBengaliNumber(overview.todayExpenses)}।\n\nখরচের বিবরণ:\n• ${breakdown}`,
-      answerEn: `Today's total expense is ${currency}${overview.todayExpenses.toLocaleString()}.\n\nDetails:\n• ${todayExpensesList.map((e) => `${e.category}: ${currency}${e.amount} (${e.description || ''})`).join('\n• ')}`,
+      answerBn: `আজকের মোট খরচ ${formatEngineMoney(overview.todayExpenses, currency)}।\n\nখরচের বিবরণ:\n• ${breakdownBn}`,
+      answerEn: `Today's total expense is ${formatEngineMoney(overview.todayExpenses, currency, true)}.\n\nDetails:\n• ${breakdownEn}`,
     };
   }
 
@@ -562,8 +593,8 @@ export const processAiBusinessQuestion = (
   ) {
     const isProfitable = overview.todayProfit >= 0;
     return {
-      answerBn: `আজকের আনুমানিক হিসাব:\n• মোট নতুন বিক্রি: ${currency}${formatBengaliNumber(overview.todaySales)}\n• মোট দোকান খরচ: ${currency}${formatBengaliNumber(overview.todayExpenses)}\n• আজকের নিট লাভ: ${currency}${formatBengaliNumber(overview.todayProfit)} ${isProfitable ? '✅' : '⚠️'}`,
-      answerEn: `Today's estimated summary:\n• Total Sales: ${currency}${overview.todaySales.toLocaleString()}\n• Total Expense: ${currency}${overview.todayExpenses.toLocaleString()}\n• Net Profit: ${currency}${overview.todayProfit.toLocaleString()}`,
+      answerBn: `আজকের আনুমানিক হিসাব:\n• মোট নতুন বিক্রি: ${formatEngineMoney(overview.todaySales, currency)}\n• মোট দোকান খরচ: ${formatEngineMoney(overview.todayExpenses, currency)}\n• আজকের নিট লাভ: ${formatEngineMoney(overview.todayProfit, currency)} ${isProfitable ? '✅' : '⚠️'}`,
+      answerEn: `Today's estimated summary:\n• Total Sales: ${formatEngineMoney(overview.todaySales, currency, true)}\n• Total Expense: ${formatEngineMoney(overview.todayExpenses, currency, true)}\n• Net Profit: ${formatEngineMoney(overview.todayProfit, currency, true)}`,
     };
   }
 
@@ -585,8 +616,8 @@ export const processAiBusinessQuestion = (
 
     const topCustomer = dueInvoices[0];
     return {
-      answerBn: `মোট ${formatBengaliNumber(dueInvoices.length)}টি অর্ডারে সর্বমোট ${currency}${formatBengaliNumber(overview.totalCustomerDue)} টাকা বাকি রয়েছে।\nসবচেয়ে বেশি বাকি রয়েছে ${topCustomer.customerName}-এর কাছে (${currency}${formatBengaliNumber(topCustomer.remainingDue)})।`,
-      answerEn: `Total ${currency}${overview.totalCustomerDue.toLocaleString()} due across ${dueInvoices.length} orders.\nHighest due is from ${topCustomer.customerName} (${currency}${topCustomer.remainingDue.toLocaleString()}).`,
+      answerBn: `মোট ${formatEngineCount(dueInvoices.length, false, currency)}টি অর্ডারে সর্বমোট ${formatEngineMoney(overview.totalCustomerDue, currency)} টাকা বাকি রয়েছে।\nসবচেয়ে বেশি বাকি রয়েছে ${topCustomer.customerName}-এর কাছে (${formatEngineMoney(topCustomer.remainingDue, currency)})।`,
+      answerEn: `Total ${formatEngineMoney(overview.totalCustomerDue, currency, true)} due across ${dueInvoices.length} orders.\nHighest due is from ${topCustomer.customerName} (${formatEngineMoney(topCustomer.remainingDue, currency, true)}).`,
       duesList: dueInvoices.map((i) => ({
         customerName: i.customerName,
         customerPhone: i.customerPhone,
@@ -623,10 +654,11 @@ export const processAiBusinessQuestion = (
 
       if (invWithMeas && invWithMeas.measurement) {
         const m = invWithMeas.measurement;
-        const details = `পোশাক: ${m.dressType || invWithMeas.dressType} (${m.unit || 'ইঞ্চি'})\n• লম্বা: ${m.length || 0}\n• বডি/বুক: ${m.bodyChest || 0}\n• কোমর: ${m.waist || 0}\n• হিপ: ${m.hip || 0}\n• শোল্ডার: ${m.shoulder || 0}\n• হাতা: ${m.sleeve || 0}\n• গলা: ${m.neck || 0}\n• ঘের: ${m.flareBottom || 0}\n${m.designNotes ? `• ডিজাইন নোট: ${m.designNotes}` : ''}`;
+        const detailsBn = `পোশাক: ${m.dressType || invWithMeas.dressType} (${m.unit || 'ইঞ্চি'})\n• লম্বা: ${m.length || 0}\n• বডি/বুক: ${m.bodyChest || 0}\n• কোমর: ${m.waist || 0}\n• হিপ: ${m.hip || 0}\n• শোল্ডার: ${m.shoulder || 0}\n• হাতা: ${m.sleeve || 0}\n• গলা: ${m.neck || 0}\n• ঘের: ${m.flareBottom || 0}\n${m.designNotes ? `• ডিজাইন নোট: ${m.designNotes}` : ''}`;
+        const detailsEn = `Dress: ${m.dressType || invWithMeas.dressType} (${m.unit || 'inch'})\n• Length: ${m.length || 0}\n• Chest: ${m.bodyChest || 0}\n• Waist: ${m.waist || 0}\n• Hip: ${m.hip || 0}\n• Shoulder: ${m.shoulder || 0}\n• Sleeve: ${m.sleeve || 0}\n• Neck: ${m.neck || 0}\n• Flare: ${m.flareBottom || 0}\n${m.designNotes ? `• Design Notes: ${m.designNotes}` : ''}`;
         return {
-          answerBn: `কাস্টমার "${targetCustomerName}"-এর সর্বশেষ সেভ করা মাপ:\n\n${details}`,
-          answerEn: `Latest measurement for "${targetCustomerName}":\n\n${details}`,
+          answerBn: `কাস্টমার "${targetCustomerName}"-এর সর্বশেষ সেভ করা মাপ:\n\n${detailsBn}`,
+          answerEn: `Latest measurement for "${targetCustomerName}":\n\n${detailsEn}`,
           customerData: {
             name: targetCustomerName,
             phone: invWithMeas.customerPhone,
@@ -676,8 +708,8 @@ export const processAiBusinessQuestion = (
       const m = lastInv.measurement;
 
       return {
-        answerBn: `কাস্টমার "${matchedCustomerName}"-এর বিস্তারিত তথ্য:\n• মোট অর্ডার: ${formatBengaliNumber(custInvoices.length)}টি\n• মোট বিল: ${currency}${formatBengaliNumber(totalAmount)}\n• জমা পরিশোধ: ${currency}${formatBengaliNumber(totalPaid)}\n• বর্তমান বাকি: ${currency}${formatBengaliNumber(totalDue)}\n\nসর্বশেষ অর্ডার (${lastInv.id}):\n• পোশাক: ${lastInv.dressType}\n• স্ট্যাটাস: ${lastInv.orderStatus}\n• ডেলিভারি তারিখ: ${lastInv.deliveryDate}`,
-        answerEn: `Customer details for "${matchedCustomerName}":\n• Total Orders: ${custInvoices.length}\n• Total Billed: ${currency}${totalAmount.toLocaleString()}\n• Paid: ${currency}${totalPaid.toLocaleString()}\n• Current Due: ${currency}${totalDue.toLocaleString()}\n\nLatest Order (${lastInv.id}):\n• Dress: ${lastInv.dressType}\n• Status: ${lastInv.orderStatus}\n• Delivery: ${lastInv.deliveryDate}`,
+        answerBn: `কাস্টমার "${matchedCustomerName}"-এর বিস্তারিত তথ্য:\n• মোট অর্ডার: ${formatEngineCount(custInvoices.length, false, currency)}টি\n• মোট বিল: ${formatEngineMoney(totalAmount, currency)}\n• জমা পরিশোধ: ${formatEngineMoney(totalPaid, currency)}\n• বর্তমান বাকি: ${formatEngineMoney(totalDue, currency)}\n\nসর্বশেষ অর্ডার (${lastInv.id}):\n• পোশাক: ${lastInv.dressType}\n• স্ট্যাটাস: ${lastInv.orderStatus}\n• ডেলিভারি তারিখ: ${lastInv.deliveryDate}`,
+        answerEn: `Customer details for "${matchedCustomerName}":\n• Total Orders: ${custInvoices.length}\n• Total Billed: ${formatEngineMoney(totalAmount, currency, true)}\n• Paid: ${formatEngineMoney(totalPaid, currency, true)}\n• Current Due: ${formatEngineMoney(totalDue, currency, true)}\n\nLatest Order (${lastInv.id}):\n• Dress: ${lastInv.dressType}\n• Status: ${lastInv.orderStatus}\n• Delivery: ${lastInv.deliveryDate}`,
         customerData: {
           name: matchedCustomerName,
           phone: lastInv.customerPhone,
@@ -756,7 +788,7 @@ export const processAiBusinessQuestion = (
       };
     }
     return {
-      answerBn: `বর্তমানে মোট ${formatBengaliNumber(readyOrders.length)}টি অর্ডার সম্পূর্ণ রেডি রয়েছে এবং কাস্টমারের ডেলিভারি নেওয়ার জন্য প্রস্তুত।`,
+      answerBn: `বর্তমানে মোট ${formatEngineCount(readyOrders.length, false, currency)}টি অর্ডার সম্পূর্ণ রেডি রয়েছে এবং কাস্টমারের ডেলিভারি নেওয়ার জন্য প্রস্তুত।`,
       answerEn: `Total ${readyOrders.length} orders are currently ready for pickup.`,
       ordersList: readyOrders.map((inv) => ({
         id: inv.id,
@@ -777,7 +809,7 @@ export const processAiBusinessQuestion = (
   ) {
     const pendingOrders = invoices.filter((i) => i.orderStatus === 'Pending' || i.orderStatus === 'In Progress');
     return {
-      answerBn: `বর্তমানে মোট ${formatBengaliNumber(pendingOrders.length)}টি অর্ডার পেন্ডিং/চলমান রয়েছে (পেন্ডিং: ${formatBengaliNumber(overview.pendingOrdersCount)}, ইন-প্রগ্রেস: ${formatBengaliNumber(overview.inProgressOrdersCount)})।`,
+      answerBn: `বর্তমানে মোট ${formatEngineCount(pendingOrders.length, false, currency)}টি অর্ডার পেন্ডিং/চলমান রয়েছে (পেন্ডিং: ${formatEngineCount(overview.pendingOrdersCount, false, currency)}, ইন-প্রগ্রেস: ${formatEngineCount(overview.inProgressOrdersCount, false, currency)})।`,
       answerEn: `Currently ${pendingOrders.length} orders are pending/in progress (Pending: ${overview.pendingOrdersCount}, In Progress: ${overview.inProgressOrdersCount}).`,
       ordersList: pendingOrders.slice(0, 10).map((inv) => ({
         id: inv.id,
@@ -815,7 +847,7 @@ export const processAiBusinessQuestion = (
     }
 
     return {
-      answerBn: `${dateLabelBn} (${targetDateStr}) মোট ${formatBengaliNumber(matchDeliveries.length)}টি অর্ডারের ডেলিভারি রয়েছে।`,
+      answerBn: `${dateLabelBn} (${targetDateStr}) মোট ${formatEngineCount(matchDeliveries.length, false, currency)}টি অর্ডারের ডেলিভারি রয়েছে।`,
       answerEn: `${matchDeliveries.length} orders scheduled for delivery ${dateLabelEn} (${targetDateStr}).`,
       ordersList: matchDeliveries.map((inv) => ({
         id: inv.id,
@@ -836,8 +868,8 @@ export const processAiBusinessQuestion = (
     /(এই মাস|চলতি মাস|বর্তমান মাস|this month).*(অর্ডার|বিক্রি|হিসাব|কতগুলো)/.test(normalizedQuery)
   ) {
     return {
-      answerBn: `এই মাসে (${currentMonthStr}):\n• মোট অর্ডার সংখ্যা: ${formatBengaliNumber(overview.monthlyOrdersCount)}টি\n• মোট বিক্রি: ${currency}${formatBengaliNumber(overview.monthlySales)}\n• মোট খরচ: ${currency}${formatBengaliNumber(overview.monthlyExpenses)}\n• আনুমানিক নিট লাভ: ${currency}${formatBengaliNumber(overview.monthlyProfit)}`,
-      answerEn: `This month (${currentMonthStr}):\n• Total Orders: ${overview.monthlyOrdersCount}\n• Total Sales: ${currency}${overview.monthlySales.toLocaleString()}\n• Total Expenses: ${currency}${overview.monthlyExpenses.toLocaleString()}\n• Net Profit: ${currency}${overview.monthlyProfit.toLocaleString()}`,
+      answerBn: `এই মাসে (${currentMonthStr}):\n• মোট অর্ডার সংখ্যা: ${formatEngineCount(overview.monthlyOrdersCount, false, currency)}টি\n• মোট বিক্রি: ${formatEngineMoney(overview.monthlySales, currency)}\n• মোট খরচ: ${formatEngineMoney(overview.monthlyExpenses, currency)}\n• আনুমানিক নিট লাভ: ${formatEngineMoney(overview.monthlyProfit, currency)}`,
+      answerEn: `This month (${currentMonthStr}):\n• Total Orders: ${overview.monthlyOrdersCount}\n• Total Sales: ${formatEngineMoney(overview.monthlySales, currency, true)}\n• Total Expenses: ${formatEngineMoney(overview.monthlyExpenses, currency, true)}\n• Net Profit: ${formatEngineMoney(overview.monthlyProfit, currency, true)}`,
     };
   }
 
@@ -866,8 +898,8 @@ export const processAiBusinessQuestion = (
 
     const top = sortedCusts[0];
     return {
-      answerBn: `আপনার দোকানের শীর্ষ কাস্টমার হলেন "${top.name}" (${top.phone || 'ফোন নেই'})।\nতিনি সর্বোচ্চ ${formatBengaliNumber(top.count)}টি অর্ডার করেছেন এবং মোট ${currency}${formatBengaliNumber(top.total)} টাকার কেনাকাটা করেছেন।`,
-      answerEn: `Your top customer is "${top.name}" (${top.phone || 'No phone'}).\nPlaced ${top.count} orders with total spent of ${currency}${top.total.toLocaleString()}.`,
+      answerBn: `আপনার দোকানের শীর্ষ কাস্টমার হলেন "${top.name}" (${top.phone || 'ফোন নেই'})।\nতিনি সর্বোচ্চ ${formatEngineCount(top.count, false, currency)}টি অর্ডার করেছেন এবং মোট ${formatEngineMoney(top.total, currency)} টাকার কেনাকাটা করেছেন।`,
+      answerEn: `Your top customer is "${top.name}" (${top.phone || 'No phone'}).\nPlaced ${top.count} orders with total spent of ${formatEngineMoney(top.total, currency, true)}.`,
       customerData: {
         name: top.name,
         phone: top.phone,
@@ -903,8 +935,8 @@ export const processAiBusinessQuestion = (
       const totalPieces = records.reduce((s, t) => s + (t.pieces || 0), 0);
 
       return {
-        answerBn: `কারিগর "${specificTailor}"-এর হিসাব বিবরণী:\n• মোট কাজ: ${formatBengaliNumber(totalPieces)} পিস পোশাক\n• মোট অর্জিত মজুরি: ${currency}${formatBengaliNumber(totalWage)}\n• পরিশোধ করা হয়েছে: ${currency}${formatBengaliNumber(totalPaid)}\n• বর্তমান বকেয়া পাওনা: ${currency}${formatBengaliNumber(totalDue)}`,
-        answerEn: `Karigar summary for "${specificTailor}":\n• Pieces sewn: ${totalPieces}\n• Total Wage: ${currency}${totalWage.toLocaleString()}\n• Paid: ${currency}${totalPaid.toLocaleString()}\n• Due Balance: ${currency}${totalDue.toLocaleString()}`,
+        answerBn: `কারিগর "${specificTailor}"-এর হিসাব বিবরণী:\n• মোট কাজ: ${formatEngineCount(totalPieces, false, currency)} পিস পোশাক\n• মোট অর্জিত মজুরি: ${formatEngineMoney(totalWage, currency)}\n• পরিশোধ করা হয়েছে: ${formatEngineMoney(totalPaid, currency)}\n• বর্তমান বকেয়া পাওনা: ${formatEngineMoney(totalDue, currency)}`,
+        answerEn: `Karigar summary for "${specificTailor}":\n• Pieces sewn: ${totalPieces}\n• Total Wage: ${formatEngineMoney(totalWage, currency, true)}\n• Paid: ${formatEngineMoney(totalPaid, currency, true)}\n• Due Balance: ${formatEngineMoney(totalDue, currency, true)}`,
         karigarData: [
           {
             tailorName: specificTailor,
@@ -923,8 +955,8 @@ export const processAiBusinessQuestion = (
     const totalPaidAll = tailorRecords.reduce((s, t) => s + (t.paidAmount || 0), 0);
 
     return {
-      answerBn: `কারিগর খাতার সার্বিক অবস্থা:\n• মোট কারিগর এন্ট্রি: ${formatBengaliNumber(tailorRecords.length)}টি\n• মোট নির্ধারিত মজুরি: ${currency}${formatBengaliNumber(totalWageAll)}\n• পরিশোধিত মজুরি: ${currency}${formatBengaliNumber(totalPaidAll)}\n• বর্তমান মোট বকেয়া মজুরি: ${currency}${formatBengaliNumber(overview.totalKarigarDue)}`,
-      answerEn: `Karigar overall ledger:\n• Total Entries: ${tailorRecords.length}\n• Total Wages: ${currency}${totalWageAll.toLocaleString()}\n• Total Paid: ${currency}${totalPaidAll.toLocaleString()}\n• Outstanding Wages: ${currency}${overview.totalKarigarDue.toLocaleString()}`,
+      answerBn: `কারিগর খাতার সার্বিক অবস্থা:\n• মোট কারিগর এন্ট্রি: ${formatEngineCount(tailorRecords.length, false, currency)}টি\n• মোট নির্ধারিত মজুরি: ${formatEngineMoney(totalWageAll, currency)}\n• পরিশোধিত মজুরি: ${formatEngineMoney(totalPaidAll, currency)}\n• বর্তমান মোট বকেয়া মজুরি: ${formatEngineMoney(overview.totalKarigarDue, currency)}`,
+      answerEn: `Karigar overall ledger:\n• Total Entries: ${tailorRecords.length}\n• Total Wages: ${formatEngineMoney(totalWageAll, currency, true)}\n• Total Paid: ${formatEngineMoney(totalPaidAll, currency, true)}\n• Outstanding Wages: ${formatEngineMoney(overview.totalKarigarDue, currency, true)}`,
     };
   }
 
@@ -942,8 +974,8 @@ export const processAiBusinessQuestion = (
     const growth = overview.salesGrowthPercent ?? 0;
     const isHigher = growth >= 0;
     return {
-      answerBn: `তুলনামূলক বিশ্লেষণ:\n• এই মাসের বিক্রি: ${currency}${formatBengaliNumber(overview.monthlySales)}\n• গত মাসের বিক্রি: ${currency}${formatBengaliNumber(overview.lastMonthSales)}\n\n${isHigher ? `এই মাসে আপনার বিক্রি গত মাসের তুলনায় ${formatBengaliNumber(growth)}% বৃদ্ধি পেয়েছে! 📈` : `এই মাসে আপনার বিক্রি গত মাসের তুলনায় ${formatBengaliNumber(Math.abs(growth))}% কম রয়েছে। 📉`}`,
-      answerEn: `Comparison analysis:\n• This month: ${currency}${overview.monthlySales.toLocaleString()}\n• Last month: ${currency}${overview.lastMonthSales.toLocaleString()}\n\nSales are ${isHigher ? `up by ${growth}%` : `down by ${Math.abs(growth)}%`} compared to last month.`,
+      answerBn: `তুলনামূলক বিশ্লেষণ:\n• এই মাসের বিক্রি: ${formatEngineMoney(overview.monthlySales, currency)}\n• গত মাসের বিক্রি: ${formatEngineMoney(overview.lastMonthSales, currency)}\n\n${isHigher ? `এই মাসে আপনার বিক্রি গত মাসের তুলনায় ${formatEngineCount(growth, false, currency)}% বৃদ্ধি পেয়েছে! 📈` : `এই মাসে আপনার বিক্রি গত মাসের তুলনায় ${formatEngineCount(Math.abs(growth), false, currency)}% কম রয়েছে। 📉`}`,
+      answerEn: `Comparison analysis:\n• This month: ${formatEngineMoney(overview.monthlySales, currency, true)}\n• Last month: ${formatEngineMoney(overview.lastMonthSales, currency, true)}\n\nSales are ${isHigher ? `up by ${growth}%` : `down by ${Math.abs(growth)}%`} compared to last month.`,
     };
   }
 
@@ -952,8 +984,8 @@ export const processAiBusinessQuestion = (
     /(ক্যাশ|ব্যালেন্স|নগদ|হাতে কত টাকা|cash balance)/.test(normalizedQuery)
   ) {
     return {
-      answerBn: `দোকানের হিসাব অনুযায়ী বর্তমান নিট ক্যাশ ব্যালেন্স: ${currency}${formatBengaliNumber(overview.cashBalance)}।\n(আজকের মোট ক্যাশ জমা: ${currency}${formatBengaliNumber(overview.todayAdvance + overview.todayDueCollected + overview.todayDeposits)}, আজকের খরচ: ${currency}${formatBengaliNumber(overview.todayExpenses)})`,
-      answerEn: `Current net cash balance in register: ${currency}${overview.cashBalance.toLocaleString()}.\n(Today's cash-in: ${currency}${(overview.todayAdvance + overview.todayDueCollected + overview.todayDeposits).toLocaleString()}, Today's cash-out: ${currency}${overview.todayExpenses.toLocaleString()})`,
+      answerBn: `দোকানের হিসাব অনুযায়ী বর্তমান নিট ক্যাশ ব্যালেন্স: ${formatEngineMoney(overview.cashBalance, currency)}।\n(আজকের মোট ক্যাশ জমা: ${formatEngineMoney(overview.todayAdvance + overview.todayDueCollected + overview.todayDeposits, currency)}, আজকের খরচ: ${formatEngineMoney(overview.todayExpenses, currency)})`,
+      answerEn: `Current net cash balance in register: ${formatEngineMoney(overview.cashBalance, currency, true)}.\n(Today's cash-in: ${formatEngineMoney(overview.todayAdvance + overview.todayDueCollected + overview.todayDeposits, currency, true)}, Today's cash-out: ${formatEngineMoney(overview.todayExpenses, currency, true)})`,
     };
   }
 
@@ -1042,23 +1074,23 @@ export const generateAiBusinessReport = (
 
   if (totalSales > 0) {
     const avgOrder = Math.round(totalSales / (totalOrdersCount || 1));
-    observationsBn.push(`অর্ডার প্রতি গড় মূল্য ছিল ${currency}${formatBengaliNumber(avgOrder)} টাকা।`);
-    observationsEn.push(`Average order value was ${currency}${avgOrder.toLocaleString()}.`);
+    observationsBn.push(`অর্ডার প্রতি গড় মূল্য ছিল ${formatEngineMoney(avgOrder, currency)} টাকা।`);
+    observationsEn.push(`Average order value was ${formatEngineMoney(avgOrder, currency, true)}.`);
   }
 
   if (readyOrders > 0) {
-    observationsBn.push(`${formatBengaliNumber(readyOrders)}টি অর্ডার রেডি রয়েছে, কাস্টমারদের দ্রুত ডেলিভারি নিতে তাগাদা পাঠান।`);
+    observationsBn.push(`${formatEngineCount(readyOrders, false, currency)}টি অর্ডার রেডি রয়েছে, কাস্টমারদের দ্রুত ডেলিভারি নিতে তাগাদা পাঠান।`);
     observationsEn.push(`${readyOrders} orders are ready for pickup, follow up with customers.`);
   }
 
   if (totalDue > 0) {
-    observationsBn.push(`এই সময়ের অর্ডারে মোট ${currency}${formatBengaliNumber(totalDue)} বকেয়া রয়েছে যা আদায়ের জন্য ফলো-আপ প্রয়োজন।`);
-    observationsEn.push(`Total ${currency}${totalDue.toLocaleString()} customer due remains to be collected.`);
+    observationsBn.push(`এই সময়ের অর্ডারে মোট ${formatEngineMoney(totalDue, currency)} বকেয়া রয়েছে যা আদায়ের জন্য ফলো-আপ প্রয়োজন।`);
+    observationsEn.push(`Total ${formatEngineMoney(totalDue, currency, true)} customer due remains to be collected.`);
   }
 
   if (estimatedNetProfit > 0) {
-    observationsBn.push(`মোট লাভজনক অনুপাত সন্তোষজনক (নিট লাভ: ${currency}${formatBengaliNumber(estimatedNetProfit)})।`);
-    observationsEn.push(`Profit margin is healthy (Net Profit: ${currency}${estimatedNetProfit.toLocaleString()}).`);
+    observationsBn.push(`মোট লাভজনক অনুপাত সন্তোষজনক (নিট লাভ: ${formatEngineMoney(estimatedNetProfit, currency)})।`);
+    observationsEn.push(`Profit margin is healthy (Net Profit: ${formatEngineMoney(estimatedNetProfit, currency, true)}).`);
   }
 
   const reportTextBn = `====================================
@@ -1068,28 +1100,59 @@ export const generateAiBusinessReport = (
 ====================================
 
 💰 আর্থিক সারসংক্ষেপ:
-• মোট বিক্রি: ${currency}${formatBengaliNumber(totalSales)}
-• অগ্রিম আদায়: ${currency}${formatBengaliNumber(totalAdvance)}
-• কাস্টমার বকেয়া: ${currency}${formatBengaliNumber(totalDue)}
-• মোট দোকান খরচ: ${currency}${formatBengaliNumber(totalExpenseAmount)}
-• অন্যান্য ক্যাশ জমা: ${currency}${formatBengaliNumber(totalDepositsAmount)}
-• আনুমানিক নিট লাভ: ${currency}${formatBengaliNumber(estimatedNetProfit)}
+• মোট বিক্রি: ${formatEngineMoney(totalSales, currency)}
+• অগ্রিম আদায়: ${formatEngineMoney(totalAdvance, currency)}
+• কাস্টমার বকেয়া: ${formatEngineMoney(totalDue, currency)}
+• মোট দোকান খরচ: ${formatEngineMoney(totalExpenseAmount, currency)}
+• অন্যান্য ক্যাশ জমা: ${formatEngineMoney(totalDepositsAmount, currency)}
+• আনুমানিক নিট লাভ: ${formatEngineMoney(estimatedNetProfit, currency)}
 
 📦 অর্ডারের পরিসংখ্যান:
-• মোট নতুন অর্ডার: ${formatBengaliNumber(totalOrdersCount)}টি
-• সক্রিয় কাস্টমার: ${formatBengaliNumber(uniqueCustomersCount)} জন
-• ডেলিভারি সম্পন্ন: ${formatBengaliNumber(deliveredOrders)}টি
-• রেডি (ডেলিভারি অপেক্ষায়): ${formatBengaliNumber(readyOrders)}টি
-• কাজ চলমান (In Progress): ${formatBengaliNumber(inProgressOrders)}টি
-• পেন্ডিং অর্ডার: ${formatBengaliNumber(pendingOrders)}টি
+• মোট নতুন অর্ডার: ${formatEngineCount(totalOrdersCount, false, currency)}টি
+• সক্রিয় কাস্টমার: ${formatEngineCount(uniqueCustomersCount, false, currency)} জন
+• ডেলিভারি সম্পন্ন: ${formatEngineCount(deliveredOrders, false, currency)}টি
+• রেডি (ডেলিভারি অপেক্ষায়): ${formatEngineCount(readyOrders, false, currency)}টি
+• কাজ চলমান (In Progress): ${formatEngineCount(inProgressOrders, false, currency)}টি
+• পেন্ডিং অর্ডার: ${formatEngineCount(pendingOrders, false, currency)}টি
 
 ✂️ কারিগর ও মজুরি হিসাব:
-• কারিগরদের মোট কাজের মজুরি: ${currency}${formatBengaliNumber(totalKarigarWages)}
-• পরিশোধিত মজুরি: ${currency}${formatBengaliNumber(totalKarigarPaid)}
-• বকেয়া মজুরি পাওনা: ${currency}${formatBengaliNumber(totalKarigarDue)}
+• কারিগরদের মোট কাজের মজুরি: ${formatEngineMoney(totalKarigarWages, currency)}
+• পরিশোধিত মজুরি: ${formatEngineMoney(totalKarigarPaid, currency)}
+• বকেয়া মজুরি পাওনা: ${formatEngineMoney(totalKarigarDue, currency)}
 
 💡 গুরুত্বপূর্ণ ব্যবসায়িক পর্যবেক্ষণ:
 ${observationsBn.map((o, idx) => `${idx + 1}. ${o}`).join('\n')}
+====================================`;
+
+  const reportTextEn = `====================================
+📊 Business AI Report
+Period: ${periodLabelEn}
+Generated: ${new Date().toLocaleDateString('en-US')}
+====================================
+
+💰 Financial Summary:
+• Total Sales: ${formatEngineMoney(totalSales, currency, true)}
+• Advance Collected: ${formatEngineMoney(totalAdvance, currency, true)}
+• Customer Dues: ${formatEngineMoney(totalDue, currency, true)}
+• Shop Expenses: ${formatEngineMoney(totalExpenseAmount, currency, true)}
+• Other Deposits: ${formatEngineMoney(totalDepositsAmount, currency, true)}
+• Estimated Net Profit: ${formatEngineMoney(estimatedNetProfit, currency, true)}
+
+📦 Order Statistics:
+• New Orders: ${totalOrdersCount} orders
+• Active Customers: ${uniqueCustomersCount} clients
+• Delivered: ${deliveredOrders} orders
+• Ready for Pickup: ${readyOrders} orders
+• In Progress: ${inProgressOrders} orders
+• Pending: ${pendingOrders} orders
+
+✂️ Karigar & Tailor Wages:
+• Total Wages Earned: ${formatEngineMoney(totalKarigarWages, currency, true)}
+• Wages Paid: ${formatEngineMoney(totalKarigarPaid, currency, true)}
+• Outstanding Due to Tailors: ${formatEngineMoney(totalKarigarDue, currency, true)}
+
+💡 Key Business Insights:
+${observationsEn.map((o, idx) => `${idx + 1}. ${o}`).join('\n')}
 ====================================`;
 
   return {
@@ -1113,5 +1176,6 @@ ${observationsBn.map((o, idx) => `${idx + 1}. ${o}`).join('\n')}
     observationsBn,
     observationsEn,
     reportTextBn,
+    reportTextEn,
   };
 };
